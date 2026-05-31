@@ -858,66 +858,13 @@ local function tpAndReset()
 end
 
 -- =============================================
---  MAP: nestId → nomor building (1=noob … 12=meowl)
+--  HELPER: fire leaveNest (keluar dari nest via remote)
 -- =============================================
-local NEST_BUILDING_ID = {
-    noob             = 1,
-    brainrot67       = 2,
-    esokSekolah      = 3,
-    karkarKurkurkur  = 4,
-    yellowLuckyBlock = 5,
-    strewberry       = 6,
-    jobJobJobSahur   = 7,
-    dragonCannelloni = 8,
-    frogioBlingo     = 9,
-    lavaGolem        = 10,
-    eleccoBee        = 11,
-    meowl            = 12,
-}
-
--- =============================================
---  HELPER: masuk nest lewat pintu building (tween)
---  Dipakai di semua bagian GRAB/KLAIM brainrot.
---  tpAndReset() TIDAK diubah (tetap untuk validasi unlock).
--- =============================================
-local function tweenEnterNest(nestId)
-    local buildingNum = NEST_BUILDING_ID[nestId]
-    if not buildingNum or not HRP then return end
-
-    -- Ambil pintu building yang sesuai
-    local door
+local function fireLeaveNest()
     pcall(function()
-        door = workspace.Game.Map.Buildings[tostring(buildingNum)].Interior.Door
+        remContainer["game.nest.leaveNest"]:FireServer()
     end)
-    if not door then return end
-
-    -- Tween ke depan pintu (speed tinggi)
-    local doorCF   = CFrame.new(door.Position)
-    local speed1   = 120
-    local dist1    = (HRP.Position - doorCF.Position).Magnitude
-    local t1 = TweenService:Create(
-        HRP,
-        TweenInfo.new(dist1 / speed1, Enum.EasingStyle.Linear),
-        { CFrame = doorCF }
-    )
-    t1:Play()
-    t1.Completed:Wait()
-
-    task.wait(0.2)
-
-    -- Tween masuk ke dalam nest
-    local targetPos = Vector3.new(-32.9, 34.3, -297.8)
-    local high      = 40
-    local targetCF  = CFrame.new(targetPos.X, targetPos.Y + high, targetPos.Z)
-    local speed2    = 60
-    local dist2     = (HRP.Position - targetCF.Position).Magnitude
-    local t2 = TweenService:Create(
-        HRP,
-        TweenInfo.new(dist2 / speed2, Enum.EasingStyle.Linear),
-        { CFrame = targetCF }
-    )
-    t2:Play()
-    t2.Completed:Wait()
+    task.wait(0.3)
 end
 
 -- =============================================
@@ -1658,8 +1605,8 @@ local function startAutoBrainrotV3()
                             gotName = n and tostring(n) or m.Name
                         end
                     end)
-                    notify("Auto Brainrot V3", "✅ Dapat " .. gotName .. "! Door → base...", 3)
-                    tweenEnterNest(nestToSearch)
+                    notify("Auto Brainrot V3", "✅ Dapat " .. gotName .. "! Leave → base...", 3)
+                    fireLeaveNest()
                     tweenToBase()
                     -- Lanjut rotasi nest berikutnya (tween di awal loop)
                 else
@@ -1714,8 +1661,8 @@ local function startAutoBrainrot()
                 end
                 task.cancel(takeSpam)
                 if not State.AutoBrainrot then break end
-                notify("Loop Ulang", "Masuk door nest → tween ke base...", 2)
-                tweenEnterNest(activeNest[2])
+                notify("Loop Ulang", "Leave nest → tween ke base...", 2)
+                fireLeaveNest()
                 tweenToBase()
                 notify("Loop Ulang", "Memulai ulang...", 2)
                 task.wait(0.1)
@@ -1808,8 +1755,8 @@ local function startAutoNearestBrainrot()
                             else
                                 local success = waitDropButton(3)
                                 if success then
-                                    notify("Auto Nearest", "Berhasil! Door → base...", 2)
-                                    tweenEnterNest(activeNest[2])
+                                    notify("Auto Nearest", "Berhasil! Leave → base...", 2)
+                                    fireLeaveNest()
                                     tweenToBase()
                                     break
                                 else
@@ -1823,8 +1770,6 @@ local function startAutoNearestBrainrot()
                         end
                     end
 
-                    tweenEnterNest(activeNest[2])
-                    tweenToBase()
                     notify("Auto Nearest", "Loop ulang...", 1)
                 end
             end
@@ -1965,8 +1910,8 @@ local function startAutoNearestBrainrotV2()
                         else
                             local success = waitDropButton(3)
                             if success then
-                                notify("Auto Nearest V2", "Berhasil! Door → base...", 2)
-                                tweenEnterNest(nestId)
+                                notify("Auto Nearest V2", "Berhasil! Leave → base...", 2)
+                                fireLeaveNest()
                                 tweenToBase()
                                 break
                             else
@@ -1981,8 +1926,6 @@ local function startAutoNearestBrainrotV2()
                 end
             end
 
-            tweenEnterNest(nestId)
-            tweenToBase()
             notify("Auto Nearest V2", "Loop ulang...", 1)
         end
     end)
@@ -2069,8 +2012,8 @@ local function startAutoBrainrotV2()
             task.cancel(takeSpam)
             if not State.AutoBrainrotV2 then break end
 
-            notify("Auto Brainrot V2", success and "Berhasil! Door → base..." or "Timeout, coba lagi...", 2)
-            tweenEnterNest(nestId)
+            notify("Auto Brainrot V2", success and "Berhasil! Leave → base..." or "Timeout, coba lagi...", 2)
+            fireLeaveNest()
             tweenToBase()
             -- Refresh HRP sebelum loop ulang
             Character = LP.Character or Character
@@ -2333,14 +2276,12 @@ TabMain:Toggle({
 -- =============================================
 local FUSE_LIST = {
     "tralala",
-    "reptistono",
     "bee",
     "pineaplino",
     "vulture",
     "rengRongo",
     "lordoRobo",
     "kingFalken",
-    "piectopus",
 }
 
 local selectedFuse = FUSE_LIST[1]
