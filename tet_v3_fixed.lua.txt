@@ -665,6 +665,27 @@ local function isInNest(nestId)
        and p.Z >= b.zMin and p.Z <= b.zMax
 end
 
+-- =============================================
+--  HELPER: cek nest sudah di-unlock:
+--  FireServer enterNest → tunggu posisi HRP berubah > 50 unit
+-- =============================================
+local function isNestUnlocked(nestId)
+    if not HRP then return false end
+    local startPos = HRP.Position
+    pcall(function()
+        remContainer["game.nest.enterNest"]:FireServer(nestId)
+    end)
+    local elapsed = 0
+    while elapsed < 4 do
+        task.wait(0.1)
+        elapsed += 0.1
+        if (HRP.Position - startPos).Magnitude > 50 then
+            return true
+        end
+    end
+    return false
+end
+
 -- V2: nest yang dipilih manual oleh user (default = nest pertama)
 local selectedNestId   = nests[1][2]
 local selectedNestName = nests[1][1]
@@ -1474,24 +1495,12 @@ local function startAutoBrainrotV3()
                 task.wait(0.4)
             end
 
-            -- Masuk nest, polling isInNest
-            local inCorrectNest = false
-            pcall(function()
-                remContainer["game.nest.enterNest"]:FireServer(nId)
-            end)
-            local enterEl = 0
-            repeat
-                task.wait(0.2)
-                enterEl += 0.2
-                Character = LP.Character or Character
-                HRP       = Character and Character:FindFirstChild("HumanoidRootPart") or HRP
-                inCorrectNest = isInNest(nId)
-            until inCorrectNest or enterEl >= 3
+            -- isNestUnlocked: FireServer enterNest + cek posisi HRP berubah
+            local inCorrectNest = isNestUnlocked(nId)
 
-            -- Reset (kill) lalu tunggu respawn di base sebelum ke nest berikutnya
-            tpAndReset()
-            waitRespawnAtBase()
-            task.wait(1)
+            -- Keluar dari nest sebelum ke nest berikutnya
+            fireLeaveNest()
+            task.wait(0.5)
 
             if inCorrectNest then
                 table.insert(validNests, {id = nId, name = nDisplayName})
@@ -1529,8 +1538,9 @@ local function startAutoBrainrotV3()
             Character = LP.Character or Character
             HRP       = Character and Character:FindFirstChild("HumanoidRootPart") or HRP
 
-            -- Masuk nest via FireServer
+            -- Masuk nest via FireServer, tunggu posisi berubah max 4 detik
             notify("Auto Brainrot V3", "▶ Masuk " .. nestToSearchName .. "...", 1)
+            local startPosEnter = HRP and HRP.Position
             pcall(function()
                 remContainer["game.nest.enterNest"]:FireServer(nestToSearch)
             end)
@@ -1538,16 +1548,18 @@ local function startAutoBrainrotV3()
             local enterElapsed = 0
             local entered = false
             repeat
-                task.wait(0.2)
-                enterElapsed += 0.2
+                task.wait(0.1)
+                enterElapsed += 0.1
                 Character = LP.Character or Character
                 HRP       = Character and Character:FindFirstChild("HumanoidRootPart") or HRP
-                entered = isInNest(nestToSearch)
-            until entered or enterElapsed >= 3
+                if HRP and startPosEnter and (HRP.Position - startPosEnter).Magnitude > 50 then
+                    entered = true
+                end
+            until entered or enterElapsed >= 4
             if not entered then
                 notify("Auto Brainrot V3", nestToSearchName .. " gagal masuk, skip...", 1)
-                HRP.CFrame = CFrame.new(BASE_POS)
-                task.wait(1)
+                fireLeaveNest()
+                task.wait(0.5)
                 continue
             end
 
@@ -1814,19 +1826,22 @@ local function startAutoNearestBrainrotV2()
 
             notify("Auto Nearest V2", "Masuk: " .. nestName, 2)
 
-            -- Masuk nest, polling isInNest max 3 detik
+            -- Masuk nest, cek posisi HRP berubah max 4 detik
+            local startPosNV2 = HRP and HRP.Position
             pcall(function()
                 remContainer["game.nest.enterNest"]:FireServer(nestId)
             end)
             local enterEl = 0
             local inCorrectNest = false
             repeat
-                task.wait(0.2)
-                enterEl += 0.2
+                task.wait(0.1)
+                enterEl += 0.1
                 Character = LP.Character or Character
                 HRP = Character and Character:FindFirstChild("HumanoidRootPart") or HRP
-                inCorrectNest = isInNest(nestId)
-            until inCorrectNest or enterEl >= 3
+                if HRP and startPosNV2 and (HRP.Position - startPosNV2).Magnitude > 50 then
+                    inCorrectNest = true
+                end
+            until inCorrectNest or enterEl >= 4
 
             if not inCorrectNest then
                 notify("Unlock This Area", nestName .. " belum di-unlock!", 3)
@@ -1978,19 +1993,22 @@ local function startAutoBrainrotV2()
 
             notify("Auto Brainrot V2", "Masuk: " .. nestName, 2)
 
-            -- Masuk nest, polling isInNest max 3 detik
+            -- Masuk nest, cek posisi HRP berubah max 4 detik
+            local startPosBV2 = HRP and HRP.Position
             pcall(function()
                 remContainer["game.nest.enterNest"]:FireServer(nestId)
             end)
             local enterEl2 = 0
             local inCorrectNest = false
             repeat
-                task.wait(0.2)
-                enterEl2 += 0.2
+                task.wait(0.1)
+                enterEl2 += 0.1
                 Character = LP.Character or Character
                 HRP = Character and Character:FindFirstChild("HumanoidRootPart") or HRP
-                inCorrectNest = isInNest(nestId)
-            until inCorrectNest or enterEl2 >= 3
+                if HRP and startPosBV2 and (HRP.Position - startPosBV2).Magnitude > 50 then
+                    inCorrectNest = true
+                end
+            until inCorrectNest or enterEl2 >= 4
 
             if not inCorrectNest then
                 notify("Unlock This Area", nestName .. " belum di-unlock!", 3)
@@ -2354,3 +2372,119 @@ for _, nest in ipairs(nests) do
 end
 
 notify("Rilzz Hub", "Script loaded!", 3)
+
+-- =============================================
+--  TAB: TOKEN MACHINE
+-- =============================================
+local TabToken = Window:Tab({ ["Title"] = "Token", ["Icon"] = "coins" })
+
+-- List brainrot yang bisa di-recycle di Token Machine
+local TOKEN_BRAINROTS = {
+    { "Cupitron UFO",         "cupitronUFO"          },
+    { "Frogzo Soda",          "frogzoSoda"           },
+    { "Tech Scorpio",         "techScorpio"          },
+    { "Singularo Assassino",  "singularoAssassino"   },
+    { "Croco Bling",          "crocoBling"           },
+    { "Tralala Tralalita",    "tralalaTralalita"     },
+    { "Reptistono",           "reptistono"           },
+    { "Elecco Bee",           "eleccoBee"            },
+    { "Pineaplino",           "pineaplino"           },
+    { "Vulture",              "vulture"              },
+    { "Reng Rongo",           "rengRongo"            },
+    { "Lordo Robo",           "lordoRobo"            },
+    { "King Falken",          "kingFalken"           },
+    { "Piectopus",            "piectopus"            },
+    { "Tracto Dino",          "tractoDino"           },
+    { "Fire Dragon",          "fireDragon"           },
+    { "Fire Medusa",          "fireMedusa"           },
+    { "Fire Cappuccino",      "fireCappuccino"       },
+    { "Sado Bananito",        "sadoBananito"         },
+    { "Grappemino Dojo",      "grappeminoDojo"       },
+    { "Tech Dimon",           "techDimon"            },
+    { "Sado Skeletono",       "sadoSkeletono"        },
+    { "Grappellino Doro",     "grappellinoDoro"      },
+    { "Din Din Valluero",     "dinDinValluero"       },
+    { "Strawberry Elephant",  "strawberryElephant"   },
+    { "Martino Gravitino",    "martinoGravitino"     },
+    { "Stoupo Traffico",      "stoupoTraffico"       },
+    { "Cupitron UFO",         "cupitronUFO"          },
+}
+
+-- Hapus duplikat
+do
+    local seen = {}
+    local clean = {}
+    for _, v in ipairs(TOKEN_BRAINROTS) do
+        if not seen[v[2]] then
+            seen[v[2]] = true
+            table.insert(clean, v)
+        end
+    end
+    TOKEN_BRAINROTS = clean
+end
+
+local selectedTokenBrainrot    = TOKEN_BRAINROTS[1][2]
+local selectedTokenBrainrotName = TOKEN_BRAINROTS[1][1]
+local autoTokenRunning = false
+local autoTokenThread  = nil
+
+-- Dropdown pilih brainrot
+local tokenDropdownValues = {}
+for _, v in ipairs(TOKEN_BRAINROTS) do
+    table.insert(tokenDropdownValues, v[1])
+end
+
+TabToken:Dropdown({
+    ["Title"]   = "Pilih Brainrot",
+    ["Values"]  = tokenDropdownValues,
+    ["Default"] = tokenDropdownValues[1],
+    ["Callback"] = function(selected)
+        for _, v in ipairs(TOKEN_BRAINROTS) do
+            if v[1] == selected then
+                selectedTokenBrainrot     = v[2]
+                selectedTokenBrainrotName = v[1]
+                notify("Token Machine", "Dipilih: " .. selected, 2)
+                break
+            end
+        end
+    end,
+})
+
+-- Tombol recycle sekali
+TabToken:Button({
+    ["Title"]    = "Recycle Sekali",
+    ["Callback"] = function()
+        pcall(function()
+            remContainer["data.tokenMachine.createRecycle"]:FireServer(selectedTokenBrainrot)
+        end)
+        notify("Token Machine", "Recycle: " .. selectedTokenBrainrotName, 2)
+    end,
+})
+
+-- Toggle auto recycle loop
+TabToken:Toggle({
+    ["Title"]   = "Auto Recycle Loop",
+    ["Default"] = false,
+    ["Callback"] = function(val)
+        autoTokenRunning = val
+        if val then
+            notify("Token Machine", "Auto Recycle ON: " .. selectedTokenBrainrotName, 2)
+            autoTokenThread = task.spawn(function()
+                while autoTokenRunning do
+                    pcall(function()
+                        remContainer["data.tokenMachine.createRecycle"]:FireServer(selectedTokenBrainrot)
+                    end)
+                    notify("Token Machine", "✅ Recycle " .. selectedTokenBrainrotName, 1)
+                    task.wait(2.5)
+                end
+            end)
+        else
+            autoTokenRunning = false
+            if autoTokenThread then
+                task.cancel(autoTokenThread)
+                autoTokenThread = nil
+            end
+            notify("Token Machine", "Auto Recycle OFF", 2)
+        end
+    end,
+})
