@@ -1,0 +1,364 @@
+--// Rilzz Hub — New Game Edition
+
+local Players           = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService  = game:GetService("UserInputService")
+local StarterGui        = game:GetService("StarterGui")
+local LP                = Players.LocalPlayer
+
+-- =============================================
+--  NOTIFY
+-- =============================================
+local function notify(title, text, dur)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title    = title,
+            Text     = text,
+            Duration = dur or 3,
+        })
+    end)
+end
+
+-- =============================================
+--  LOAD LIBRARY
+-- =============================================
+local Library = loadstring(game:HttpGet("https://pastefy.app/TaC9quOO/raw"))()
+
+-- =============================================
+--  WINDOW
+-- =============================================
+local isMobile = table.find(
+    {Enum.Platform.Android, Enum.Platform.IOS},
+    UserInputService:GetPlatform()
+)
+local windowSize = isMobile
+    and UDim2.fromOffset(528, 334)
+    or  UDim2.fromOffset(580, 350)
+
+local Window = Library:CreateWindow({
+    ["Title"]              = "Rilzz Hub",
+    ["Icon"]               = "crown",
+    ["Author"]             = "Fight A Lucky Blocks",
+    ["Folder"]             = "RilzzHub",
+    ["Size"]               = windowSize,
+    ["LiveSearchDropdown"] = true,
+    ["FileSaveName"]       = "RilzzHub/Config.json",
+})
+
+-- =============================================
+--  TABS
+-- =============================================
+local TabMain  = Window:Tab({ ["Title"] = "Main",     ["Icon"] = "house"   })
+local TabExtra = Window:Tab({ ["Title"] = "Extra",    ["Icon"] = "zap"     })
+local TabTP    = Window:Tab({ ["Title"] = "Teleport", ["Icon"] = "map-pin" })
+
+-- =============================================
+--  STATE & THREADS
+-- =============================================
+local State = {
+    AutoTrain   = false,
+    AutoRebirth = false,
+    AutoCollect = false,
+    AutoFight   = false,
+}
+local threads = {}
+
+local function stopThread(name)
+    if threads[name] then
+        task.cancel(threads[name])
+        threads[name] = nil
+    end
+end
+
+-- =============================================
+--  REMOTE PATH
+-- =============================================
+local function getLink()
+    return ReplicatedStorage
+        :WaitForChild("ConsPackages")
+        :WaitForChild("Link")
+end
+
+-- =============================================
+--  AUTO TRAIN (Toggle)
+-- =============================================
+TabMain:Toggle({
+    ["Title"]   = "Auto Train",
+    ["Default"] = false,
+    ["Callback"] = function(v)
+        State.AutoTrain = v
+        if v then
+            threads.AutoTrain = task.spawn(function()
+                local popupCount = 0
+                local remote = getLink()
+                    :WaitForChild("RemoteEvents")
+                    :WaitForChild("Claim2xBoost")
+
+                local ms     = LP.PlayerGui:WaitForChild("MainScreen", 10)
+                local hud    = ms:WaitForChild("HUD", 10)
+                local popups = hud:WaitForChild("LocalToSpawnPopUps", 10)
+
+                local conn = popups.ChildAdded:Connect(function(obj)
+                    task.spawn(function()
+                        if not obj:IsA("ImageButton") then return end
+                        for _, c in ipairs(obj:GetDescendants()) do
+                            if c:IsA("TextLabel") and c.Text == "2x" then
+                                task.wait(0.05)
+                                popupCount += 1
+                                pcall(function()
+                                    remote:FireServer(popupCount)
+                                end)
+                                break
+                            end
+                        end
+                    end)
+                end)
+
+                while State.AutoTrain do task.wait(0.5) end
+                conn:Disconnect()
+            end)
+        else
+            stopThread("AutoTrain")
+        end
+    end,
+})
+
+-- =============================================
+--  AUTO COLLECT CASH (Toggle)
+-- =============================================
+TabMain:Toggle({
+    ["Title"]   = "Auto Collect Cash",
+    ["Default"] = false,
+    ["Callback"] = function(v)
+        State.AutoCollect = v
+        if v then
+            threads.AutoCollect = task.spawn(function()
+                local function getMyBase()
+                    local bases = workspace:FindFirstChild("Bases")
+                    if not bases then return end
+                    for _, base in ipairs(bases:GetChildren()) do
+                        if base:GetAttribute("OwnerName") == LP.Name then
+                            return base
+                        end
+                    end
+                end
+
+                local function touch(hitbox)
+                    local character = LP.Character
+                    if not character then return end
+                    local hrp = character:FindFirstChild("HumanoidRootPart")
+                    if not hrp then return end
+                    firetouchinterest(hrp, hitbox, 0)
+                    task.wait(0.01)
+                    firetouchinterest(hrp, hitbox, 1)
+                end
+
+                local function collectPads(folder)
+                    if not folder then return end
+                    for _, pad in ipairs(folder:GetChildren()) do
+                        local hitbox = pad:FindFirstChild("ClaimHitbox")
+                        if hitbox then
+                            touch(hitbox)
+                            task.wait(0.01)
+                        end
+                    end
+                end
+
+                while State.AutoCollect do
+                    local myBase = getMyBase()
+                    if myBase then
+                        collectPads(myBase:FindFirstChild("Pads"))
+                        local extraFloors = myBase:FindFirstChild("ExtraFloors")
+                        if extraFloors then
+                            for _, floor in ipairs(extraFloors:GetChildren()) do
+                                collectPads(floor:FindFirstChild("Pads"))
+                            end
+                        end
+                    end
+                    task.wait(0.02)
+                end
+            end)
+        else
+            stopThread("AutoCollect")
+        end
+    end,
+})
+
+-- =============================================
+--  AUTO REBIRTH (Toggle)
+-- =============================================
+TabMain:Toggle({
+    ["Title"]   = "Auto Rebirth",
+    ["Default"] = false,
+    ["Callback"] = function(v)
+        State.AutoRebirth = v
+        if v then
+            threads.AutoRebirth = task.spawn(function()
+                while State.AutoRebirth do
+                    pcall(function()
+                        getLink()
+                            :WaitForChild("RemoteFunctions")
+                            :WaitForChild("RebirthRequest")
+                            :InvokeServer()
+                    end)
+                    task.wait(3)
+                end
+            end)
+        else
+            stopThread("AutoRebirth")
+        end
+    end,
+})
+
+-- =============================================
+--  AUTO FIGHT (Toggle)
+-- =============================================
+TabMain:Toggle({
+    ["Title"]   = "Auto Fight",
+    ["Default"] = false,
+    ["Callback"] = function(v)
+        State.AutoFight = v
+        if v then
+            threads.AutoFight = task.spawn(function()
+                local character = LP.Character or LP.CharacterAdded:Wait()
+                local hrp       = character:WaitForChild("HumanoidRootPart")
+
+                local remote = getLink()
+                    :WaitForChild("RemoteEvents")
+                    :WaitForChild("DamageBoostClick")
+
+                local brainrotHealth = LP.PlayerGui
+                    :WaitForChild("MainScreen")
+                    :WaitForChild("HUD")
+                    :WaitForChild("BrainrotHealth")
+
+                local targetPos = CFrame.new(281.8, 6.8, 339.1)
+
+                while State.AutoFight do
+                    local c = LP.Character
+                    if c then
+                        hrp = c:FindFirstChild("HumanoidRootPart") or hrp
+                    end
+
+                    hrp.CFrame = targetPos
+
+                    while not brainrotHealth.Visible and State.AutoFight do
+                        task.wait(0.1)
+                    end
+
+                    while brainrotHealth.Visible and State.AutoFight do
+                        pcall(function() remote:FireServer() end)
+                        task.wait(0.1)
+                    end
+                end
+            end)
+        else
+            stopThread("AutoFight")
+        end
+    end,
+})
+
+-- =============================================
+--  BYPASS LIKE (Button)
+-- =============================================
+TabMain:Button({
+    ["Title"]    = "Bypass Like",
+    ["Callback"] = function()
+        pcall(function()
+            getLink()
+                :WaitForChild("RemoteFunctions")
+                :WaitForChild("ClaimLikeRewards")
+                :InvokeServer(true, true)
+        end)
+        notify("Bypass Like", "Like reward diklaim!", 3)
+    end,
+})
+
+-- =============================================
+--  UPGRADE BASE (Button)
+-- =============================================
+TabMain:Button({
+    ["Title"]    = "Upgrade Base",
+    ["Callback"] = function()
+        local remote = getLink()
+            :WaitForChild("RemoteEvents")
+            :WaitForChild("UpgradeBase")
+        for i = 1, 30 do
+            pcall(function() remote:FireServer() end)
+            task.wait(0.1)
+        end
+        notify("Upgrade Base", "30x upgrade dikirim!", 2)
+    end,
+})
+
+-- =============================================
+--  TAB EXTRA
+-- =============================================
+
+-- BUY ALL WEIGHT (Button)
+TabExtra:Button({
+    ["Title"]    = "Buy All Weight",
+    ["Callback"] = function()
+        local remote = getLink()
+            :WaitForChild("RemoteEvents")
+            :WaitForChild("BuyWeightCash")
+
+        local weights = {
+            "Stick","GoldenStick","BigStick",
+            "Brick","RedBrick","ConcreteBrick",
+            "Weight","BigWeight","HugeWeight",
+            "GoldenWeight","DiamondWeight","SimpleWeight",
+            "WoodWeight","AlienWeight","NeonWeight",
+            "GoldenSlab","StoneDumbbell","ConcreteBlock",
+            "GasTank","TireStack",
+            "Dumbbell","PinkDumbbell","RedDumbbell","GoldDumbbell",
+            "BigGreenDumbbell","BigBlueDumbbell",
+            "BigRedDumbbell","BigOrangeDumbbell",
+            "Washer","WoodWasher","GreenWasher","GoldWasher","PinkWasher",
+        }
+
+        for _, name in ipairs(weights) do
+            pcall(function()
+                remote:FireServer(name)
+            end)
+            task.wait(0.15)
+        end
+        notify("Buy Weight", "Semua weight dibeli!", 3)
+    end,
+})
+
+-- EQUIP ALL BRAINROT 1-30 (Button)
+TabExtra:Button({
+    ["Title"]    = "Equip All Brainrot ( 1 - 30 )",
+    ["Callback"] = function()
+        local remote = getLink()
+            :WaitForChild("RemoteEvents")
+            :WaitForChild("PadAction")
+
+        for i = 1, 30 do
+            pcall(function()
+                remote:FireServer(tostring(i))
+            end)
+            task.wait(0.1)
+        end
+        notify("Equip Brainrot", "Slot 1-30 di-equip!", 3)
+    end,
+})
+
+-- =============================================
+--  TAB TELEPORT
+-- =============================================
+TabTP:Button({
+    ["Title"]    = "TP ke Arena Fight",
+    ["Callback"] = function()
+        local c   = LP.Character
+        local hrp = c and c:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = CFrame.new(281.8, 6.8, 339.1)
+            notify("Teleport", "TP ke Arena Fight!", 2)
+        end
+    end,
+})
+
+-- =============================================
+notify("Rilzz Hub", "Script loaded!", 3)
