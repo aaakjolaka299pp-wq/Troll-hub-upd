@@ -1,0 +1,34 @@
+local SupportedMaps = {
+    [92416421522960] = "https://pastefy.app/wONsXmXY/raw",
+    [138096575744330] = "https://pastefy.app/OWYAAskT/raw",
+    [81886892648876] = "https://pastefy.app/HZrU2NRh/raw",
+    [88728793053496] = "https://pastefy.app/9DjDCrcX/raw",
+    [102932927045764] = "https://pastefy.app/SryjCVzx/raw",
+    [79091703265657] = "https://pastefy.app/ysz0XRnp/raw",
+    [77747658251236] = "https://pastefy.app/FZrj5sZE/raw",
+    [114115486822297] = "https://pastefy.app/la3rRgVb/raw",
+    [105742951729183] = "https://pastefy.app/YL8zCQck/raw",
+    [105633123928294] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/tet_v3_fixed.lua.txt",
+    [89469502395769] = "https://pastefy.app/VZtZyk5T/raw",
+    [90317329469165] = "https://pastefy.app/uTz9qgFO/raw",
+    [139367151366359] = "https://pastefy.app/daINTSiE/raw",
+    [72186631218980] = "https://pastefy.app/aylogTo5/raw",
+    [111646019571894] = "https://pastefy.app/Cc22W7xW/raw",
+    [122889506854558] = "https://pastefy.app/sjXoJh3R/raw",
+    [85218047087436] = "https://pastefy.app/qOqufosm/raw",
+    [137069154816703] = "https://pastefy.app/uKXJpQL0/raw",
+    [114043013325512] = "https://pastefy.app/B9tAlfr9/raw",
+    [102743253440175] = "https://pastefy.app/nnsgwk4G/raw",
+    [107646426076756] = "https://pastefy.app/9EP58Vjc/raw",
+    [90247694815078] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Fight",
+    [75888315541325] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Dupe%20pushrock",
+    [135882949571046] = "https://pastefy.app/GAxFfLvc/raw"
+}
+
+local scriptUrl = SupportedMaps[game.PlaceId]
+
+if scriptUrl then
+    loadstring(game:HttpGet(scriptUrl))()
+else
+    game.Players.LocalPlayer:Kick("Map Tidak Support")
+end
