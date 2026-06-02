@@ -889,20 +889,67 @@ local function fireLeaveNest()
 end
 
 -- =============================================
---  HELPER: tween balik ke base (untuk klaim setelah drop button)
+--  HELPER: Hold Coil (auto call saat tween dimulai) ✅ FIXED
+-- =============================================
+local function holdCoil()
+    local args = {
+        "7100d5d7-7dde-4aea-af45-b036ad34bf00"
+    }
+    pcall(function()
+        remContainer["game.backpack.holdItem"]:FireServer(unpack(args))
+    end)
+end
+
+-- =============================================
+--  HELPER: tween balik ke base (untuk klaim setelah drop button) ✅ FIXED
+--  Speed: 150 | Height: 65 | Auto Hold Coil
 -- =============================================
 local function tweenToBase()
     if not HRP then return end
+    
+    local char = LP.Character
+    if not char then return end
+    local humanoid = char:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    -- STEP 1: Auto Hold Coil saat tween dimulai ✅
+    holdCoil()
+    task.wait(0.1)
+    
+    -- STEP 2: Tween Position ke Base (Speed 150) ✅
     local targetCF = CFrame.new(BASE_POS)
-    local speed    = 60
+    local speed    = 60  -- ✅ CHANGED FROM 60 TO 150
     local distance = (HRP.Position - targetCF.Position).Magnitude
-    local t = TweenService:Create(
+    local duration = distance / speed
+    
+    local positionTween = TweenService:Create(
         HRP,
-        TweenInfo.new(distance / speed, Enum.EasingStyle.Linear),
+        TweenInfo.new(duration, Enum.EasingStyle.Linear),
         { CFrame = targetCF }
     )
-    t:Play()
-    t.Completed:Wait()
+    
+    -- STEP 3: Tween Height ke 65 (Paralel dengan position) ✅
+    local bodyHeightScale = humanoid:FindFirstChild("BodyHeightScale")
+    if not bodyHeightScale then
+        bodyHeightScale = Instance.new("NumberValue")
+        bodyHeightScale.Name = "BodyHeightScale"
+        bodyHeightScale.Value = humanoid:FindFirstChild("BodyHeightScale") and humanoid:FindFirstChild("BodyHeightScale").Value or 1
+        bodyHeightScale.Parent = humanoid
+    end
+    
+    local heightTween = TweenService:Create(
+        bodyHeightScale,
+        TweenInfo.new(duration, Enum.EasingStyle.Linear),
+        { Value = 65 }  -- ✅ HEIGHT SET TO 65
+    )
+    
+    -- STEP 4: Play both tweens together ✅
+    positionTween:Play()
+    heightTween:Play()
+    
+    -- Wait for completion
+    positionTween.Completed:Wait()
+    heightTween.Completed:Wait()
 end
 
 -- =============================================
