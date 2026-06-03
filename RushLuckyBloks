@@ -1,0 +1,374 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local destroying = false
+local godConnections = {}
+
+getgenv().BonusTrain = false
+getgenv().CollectCash = false
+getgenv().GodMode = false
+getgenv().AutoRebirth = false
+getgenv().AutoUpgradeAll = false
+getgenv().AutoUpgrade = false
+getgenv().AutoBuyAura = false
+getgenv().AutoBuyDummy = false
+getgenv().AutoClaimGift = false
+
+local knitBase = ReplicatedStorage
+    :WaitForChild("Packages")
+    :WaitForChild("_Index")
+    :WaitForChild("sleitnick_knit@1.7.0")
+    :WaitForChild("knit")
+    :WaitForChild("Services")
+
+local RebirthRemote = knitBase:WaitForChild("RebirthService"):WaitForChild("RF"):WaitForChild("Rebirth")
+local UpgradeBrainrot = knitBase:WaitForChild("ContainerService"):WaitForChild("RF"):WaitForChild("UpgradeBrainrot")
+local BuySkin = knitBase:WaitForChild("SkinService"):WaitForChild("RF"):WaitForChild("BuySkin")
+local BuyTrainTool = knitBase:WaitForChild("TrainingService"):WaitForChild("RF"):WaitForChild("BuyTrainTool")
+local ClaimGift = knitBase:WaitForChild("PlaytimeRewardService"):WaitForChild("RF"):WaitForChild("ClaimGift")
+
+local selectedSlot = 1
+
+local Rilzz = loadstring(game:HttpGet(
+    "https://pastefy.app/mPtQVFoh/raw?part=addon.lua"
+))()
+
+local Win = Rilzz:CreateWindow({
+    Name = "Rilzz Hub",
+    Version = "v3.0",
+    ToggleUIKeybind = "RightShift",
+    Theme = "Purple",
+    Credits = { Author = "Rilzz" },
+    ConfigurationSaving = { Enabled = true, FileName = "RilzzHub" },
+    Features = {
+        Watermark = true,
+        FPSCounter = true,
+        StatsPanel = true,
+        RippleEffect = true,
+        AnnouncementBanner = "Welcome To Rilzz Hub!",
+        ClockWidget = true,
+        ScrollingTabBar = true,
+    }
+})
+
+local Main = Win:CreateTab("Main")
+
+-- ========================
+-- HELPERS
+-- ========================
+local function getHRP()
+    local char = LocalPlayer.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+-- ========================
+-- BONUS TRAIN
+-- ========================
+Main:CreateToggle({
+    Name = "Bonus Train",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().BonusTrain = v
+        task.spawn(function()
+            while getgenv().BonusTrain and not destroying do
+                pcall(function()
+                    local btn = LocalPlayer.PlayerGui
+                        :WaitForChild("SpeedEffect")
+                        :WaitForChild("LeftContainer")
+                        :WaitForChild("Currency")
+                        :WaitForChild("Speed")
+                        :WaitForChild("x2Speed")
+                        :WaitForChild("Button")
+                    if btn.Parent.Visible then
+                        for _, conn in pairs(getconnections(btn.Activated)) do
+                            pcall(function() conn.Function() end)
+                        end
+                    end
+                end)
+                task.wait(0.1)
+            end
+        end)
+    end
+})
+
+-- ========================
+-- COLLECT CASH
+-- ========================
+Main:CreateToggle({
+    Name = "Collect Cash",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().CollectCash = v
+        task.spawn(function()
+            while getgenv().CollectCash and not destroying do
+                pcall(function()
+                    local hrp = getHRP()
+                    if not hrp then return end
+                    local Plots = Workspace:FindFirstChild("Plots")
+                    if not Plots then return end
+                    for _, plotFolder in pairs(Plots:GetChildren()) do
+                        for _, plotModel in pairs(plotFolder:GetChildren()) do
+                            local containers = plotModel:FindFirstChild("Containers")
+                            if containers then
+                                for _, slot in pairs(containers:GetChildren()) do
+                                    for _, inner in pairs(slot:GetChildren()) do
+                                        local collection = inner:FindFirstChild("Collection")
+                                        if collection then
+                                            local pad = collection:FindFirstChild("CollectionPad")
+                                            if pad and pad:IsA("BasePart") then
+                                                firetouchinterest(hrp, pad, 0)
+                                                firetouchinterest(hrp, pad, 1)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end)
+                task.wait(0.5)
+            end
+        end)
+    end
+})
+
+-- ========================
+-- GOD MODE
+-- ========================
+local function applyToCharacter(character)
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        humanoid.MaxHealth = math.huge
+        humanoid.Health = math.huge
+    end
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanTouch = false
+            part.CanQuery = false
+        end
+    end
+end
+
+local function enableGodMode()
+    if LocalPlayer.Character then
+        applyToCharacter(LocalPlayer.Character)
+    end
+    local conn = LocalPlayer.CharacterAdded:Connect(function(character)
+        task.wait(0.5)
+        applyToCharacter(character)
+    end)
+    table.insert(godConnections, conn)
+    task.spawn(function()
+        while getgenv().GodMode do
+            pcall(function()
+                local humanoid = LocalPlayer.Character
+                    and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.MaxHealth = math.huge
+                    humanoid.Health = math.huge
+                end
+            end)
+            task.wait(0.1)
+        end
+    end)
+end
+
+local function disableGodMode()
+    for _, conn in ipairs(godConnections) do
+        conn:Disconnect()
+    end
+    godConnections = {}
+    if LocalPlayer.Character then
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.MaxHealth = 100
+            humanoid.Health = 100
+        end
+    end
+end
+
+Main:CreateToggle({
+    Name = "God Mode",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().GodMode = v
+        if v then enableGodMode() else disableGodMode() end
+    end
+})
+
+-- ========================
+-- AUTO REBIRTH
+-- ========================
+Main:CreateToggle({
+    Name = "Auto Rebirth",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().AutoRebirth = v
+        task.spawn(function()
+            while getgenv().AutoRebirth and not destroying do
+                pcall(function()
+                    RebirthRemote:InvokeServer()
+                end)
+                task.wait(5)
+            end
+        end)
+    end
+})
+
+-- ========================
+-- AUTO UPGRADE ALL
+-- ========================
+Main:CreateToggle({
+    Name = "Auto Upgrade All",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().AutoUpgradeAll = v
+        task.spawn(function()
+            while getgenv().AutoUpgradeAll and not destroying do
+                for i = 1, 30 do
+                    if not getgenv().AutoUpgradeAll then break end
+                    pcall(function()
+                        local args = {tostring(i)}
+                        UpgradeBrainrot:InvokeServer(unpack(args))
+                    end)
+                    task.wait(0.1)
+                end
+                task.wait(3)
+            end
+        end)
+    end
+})
+
+-- ========================
+-- AUTO UPGRADE SELECTED SLOT
+-- ========================
+Main:CreateDropdown({
+    Name = "Select Slot",
+    Options = {
+        "1","2","3","4","5","6","7","8","9","10",
+        "11","12","13","14","15","16","17","18","19","20",
+        "21","22","23","24","25","26","27","28","29","30"
+    },
+    CurrentOption = "1",
+    Callback = function(v)
+        selectedSlot = tonumber(v)
+    end
+})
+
+Main:CreateToggle({
+    Name = "Auto Upgrade (Selected Slot)",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().AutoUpgrade = v
+        task.spawn(function()
+            while getgenv().AutoUpgrade and not destroying do
+                pcall(function()
+                    local args = {tostring(selectedSlot)}
+                    UpgradeBrainrot:InvokeServer(unpack(args))
+                end)
+                task.wait(3)
+            end
+        end)
+    end
+})
+
+-- ========================
+-- AUTO BUY ALL AURA
+-- ========================
+local auras = {
+    "justice_aura", "azure_aura", "verdant_aura", "solar_aura",
+    "cursed_aura", "ancient_aura", "venom_aura", "holy_aura",
+    "doom_aura", "reaper_aura"
+}
+
+Main:CreateToggle({
+    Name = "Auto Buy All Aura",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().AutoBuyAura = v
+        task.spawn(function()
+            while getgenv().AutoBuyAura and not destroying do
+                for _, aura in ipairs(auras) do
+                    if not getgenv().AutoBuyAura then break end
+                    pcall(function()
+                        local args = {aura}
+                        BuySkin:InvokeServer(unpack(args))
+                    end)
+                    task.wait(0.1)
+                end
+                task.wait(3)
+            end
+        end)
+    end
+})
+
+-- ========================
+-- AUTO BUY ALL DUMMY
+-- ========================
+local dummies = {
+    "basic_dummy", "armored_dummy", "golden_dummy", "diamond_dummy",
+    "infernal_dummy", "spike_dummy", "boneca_dummy", "noob_dummy",
+    "ta_ta_dummy", "glitched_dummy", "ocean_dummy", "galactic_dummy",
+    "paw_dummy", "monitor_dummy", "hacked_dummy", "corrupted_dummy",
+    "67_dummy", "devilball_dummy", "magia_dummy", "bomba_dummy",
+    "capuchino_dummy"
+}
+
+Main:CreateToggle({
+    Name = "Auto Buy All Dummy",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().AutoBuyDummy = v
+        task.spawn(function()
+            while getgenv().AutoBuyDummy and not destroying do
+                for _, dummy in ipairs(dummies) do
+                    if not getgenv().AutoBuyDummy then break end
+                    pcall(function()
+                        local args = {dummy}
+                        BuyTrainTool:InvokeServer(unpack(args))
+                    end)
+                    task.wait(0.1)
+                end
+                task.wait(3)
+            end
+        end)
+    end
+})
+
+-- ========================
+-- AUTO CLAIM ALL GIFT
+-- ========================
+Main:CreateToggle({
+    Name = "Auto Claim All Gift",
+    CurrentValue = false,
+    Callback = function(v)
+        getgenv().AutoClaimGift = v
+        task.spawn(function()
+            while getgenv().AutoClaimGift and not destroying do
+                for i = 1, 12 do
+                    if not getgenv().AutoClaimGift then break end
+                    pcall(function()
+                        local args = {i}
+                        ClaimGift:InvokeServer(unpack(args))
+                    end)
+                    task.wait(0.1)
+                end
+                task.wait(3)
+            end
+        end)
+    end
+})
+
+-- ========================
+-- CONFIRM
+-- ========================
+Win:Confirm({
+    Title = "Rilzz Hub",
+    Content = "Script Loaded Successfully!",
+    OnConfirm = function() print("Loaded") end,
+    OnCancel = function() print("Cancelled") end,
+})
+
+Rilzz:LoadConfiguration()
