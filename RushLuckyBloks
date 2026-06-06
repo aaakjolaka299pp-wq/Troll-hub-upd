@@ -1,20 +1,32 @@
+-- Combined Hub | Lucky Block Rush + Rilzz Hub
+-- Script yang sudah di-debug dan fixed
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local LocalPlayer = Players.LocalPlayer
-local destroying = false
-local godConnections = {}
+local Players           = game:GetService("Players")
+local VIM               = game:GetService("VirtualInputManager")
+local VirtualUser       = game:GetService("VirtualUser")
+local LocalPlayer       = Players.LocalPlayer
+local destroying        = false
+local godConnections    = {}
 
-getgenv().BonusTrain = false
-getgenv().CollectCash = false
-getgenv().GodMode = false
-getgenv().AutoRebirth = false
-getgenv().AutoUpgradeAll = false
-getgenv().AutoUpgrade = false
-getgenv().AutoBuyAura = false
-getgenv().AutoBuyDummy = false
-getgenv().AutoClaimGift = false
+getgenv().AutoMobs        = false
+getgenv().AutoAttack      = false
+getgenv().BonusTrain      = false
+getgenv().CollectCash     = false
+getgenv().GodMode         = false
+getgenv().AutoRebirth     = false
+getgenv().AutoClaimGift   = false
+getgenv().AntiAfk         = false
+getgenv().AutoUpgradeAll  = false
+getgenv().AutoBuyAura     = false
+getgenv().AutoBuyDummy    = false
 
+local setDistance = 11
+local mobPosition = "Above"
+
+-- ========================
+-- REMOTES (diload sekali di atas)
+-- ========================
 local knitBase = ReplicatedStorage
     :WaitForChild("Packages")
     :WaitForChild("_Index")
@@ -22,114 +34,178 @@ local knitBase = ReplicatedStorage
     :WaitForChild("knit")
     :WaitForChild("Services")
 
-local RebirthRemote = knitBase:WaitForChild("RebirthService"):WaitForChild("RF"):WaitForChild("Rebirth")
+local RebirthRemote   = knitBase:WaitForChild("RebirthService"):WaitForChild("RF"):WaitForChild("Rebirth")
 local UpgradeBrainrot = knitBase:WaitForChild("ContainerService"):WaitForChild("RF"):WaitForChild("UpgradeBrainrot")
-local BuySkin = knitBase:WaitForChild("SkinService"):WaitForChild("RF"):WaitForChild("BuySkin")
-local BuyTrainTool = knitBase:WaitForChild("TrainingService"):WaitForChild("RF"):WaitForChild("BuyTrainTool")
-local ClaimGift = knitBase:WaitForChild("PlaytimeRewardService"):WaitForChild("RF"):WaitForChild("ClaimGift")
+local BuySkin         = knitBase:WaitForChild("SkinService"):WaitForChild("RF"):WaitForChild("BuySkin")
+local BuyTrainTool    = knitBase:WaitForChild("TrainingService"):WaitForChild("RF"):WaitForChild("BuyTrainTool")
+local ClaimGift       = knitBase:WaitForChild("PlaytimeRewardService"):WaitForChild("RF"):WaitForChild("ClaimGift")
 
-local selectedSlot = 1
+-- ========================
+-- HELPERS
+-- ========================
+local function isMyPlot(model)
+    for _, child in ipairs(model:GetChildren()) do
+        if child:IsA("BillboardGui") and child.Name:find(LocalPlayer.Name) then
+            return true
+        end
+    end
+    return false
+end
 
+-- ========================
+-- LOAD LIBRARY (PENTING: Set theme dulu)
+-- ========================
 local Rilzz = loadstring(game:HttpGet(
     "https://pastefy.app/mPtQVFoh/raw?part=addon.lua"
 ))()
 
 local Win = Rilzz:CreateWindow({
-    Name = "Rilzz Hub",
-    Version = "v3.0",
-    ToggleUIKeybind = "RightShift",
-    Theme = "Purple",
-    Credits = { Author = "Rilzz" },
-    ConfigurationSaving = { Enabled = true, FileName = "RilzzHub" },
+    Name              = "Rilzz Hub",
+    Version           = "v4.0",
+    ToggleUIKeybind   = "RightShift",
+    Theme             = "Purple",
+    Credits           = { Author = "Rilzz" },
+    ConfigurationSaving = { Enabled = true, FileName = "RilzzHubV4" },
     Features = {
-        Watermark = true,
-        FPSCounter = true,
-        StatsPanel = true,
-        RippleEffect = true,
+        Watermark          = true,
+        FPSCounter         = true,
+        StatsPanel         = true,
+        RippleEffect       = true,
         AnnouncementBanner = "Welcome To Rilzz Hub!",
-        ClockWidget = true,
-        ScrollingTabBar = true,
+        ClockWidget        = true,
+        ScrollingTabBar    = true,
     }
 })
 
-local Main = Win:CreateTab("Main")
+-- ==================================================
+-- TAB: FIGHT
+-- ==================================================
+local TabFight = Win:CreateTab("Fight")
 
--- ========================
--- HELPERS
--- ========================
-local function getHRP()
-    local char = LocalPlayer.Character
-    return char and char:FindFirstChild("HumanoidRootPart")
-end
+-- Slider & Dropdown - INISIAL DULU SEBELUM TOGGLE
+TabFight:CreateSection("Mob Settings")
 
--- ========================
--- BONUS TRAIN
--- ========================
-Main:CreateToggle({
-    Name = "Bonus Train",
-    CurrentValue = false,
+TabFight:CreateSlider({
+    Name     = "Set Distance",
+    Min      = 11,
+    Max      = 20,
+    Default  = 11,
     Callback = function(v)
-        getgenv().BonusTrain = v
-        task.spawn(function()
-            while getgenv().BonusTrain and not destroying do
-                pcall(function()
-                    local btn = LocalPlayer.PlayerGui
-                        :WaitForChild("SpeedEffect")
-                        :WaitForChild("LeftContainer")
-                        :WaitForChild("Currency")
-                        :WaitForChild("Speed")
-                        :WaitForChild("x2Speed")
-                        :WaitForChild("Button")
-                    if btn.Parent.Visible then
-                        for _, conn in pairs(getconnections(btn.Activated)) do
-                            pcall(function() conn.Function() end)
-                        end
-                    end
-                end)
-                task.wait(0.1)
-            end
-        end)
+        setDistance = v
+    end
+})
+
+TabFight:CreateDropdown({
+    Name          = "Mob Position",
+    Options       = {"Above", "Front"},
+    CurrentOption = {"Above"},
+    MultipleOptions = false,
+    Callback      = function(Options)
+        mobPosition = Options[1] or "Above"
     end
 })
 
 -- ========================
--- COLLECT CASH
+-- AUTO MOBS - LOGIC UTAMA
 -- ========================
-Main:CreateToggle({
-    Name = "Collect Cash",
-    CurrentValue = false,
-    Callback = function(v)
-        getgenv().CollectCash = v
-        task.spawn(function()
-            while getgenv().CollectCash and not destroying do
-                pcall(function()
-                    local hrp = getHRP()
-                    if not hrp then return end
-                    local Plots = Workspace:FindFirstChild("Plots")
-                    if not Plots then return end
-                    for _, plotFolder in pairs(Plots:GetChildren()) do
-                        for _, plotModel in pairs(plotFolder:GetChildren()) do
-                            local containers = plotModel:FindFirstChild("Containers")
-                            if containers then
-                                for _, slot in pairs(containers:GetChildren()) do
-                                    for _, inner in pairs(slot:GetChildren()) do
-                                        local collection = inner:FindFirstChild("Collection")
-                                        if collection then
-                                            local pad = collection:FindFirstChild("CollectionPad")
-                                            if pad and pad:IsA("BasePart") then
-                                                firetouchinterest(hrp, pad, 0)
-                                                firetouchinterest(hrp, pad, 1)
-                                            end
-                                        end
-                                    end
-                                end
-                            end
+local function startMobs()
+    task.spawn(function()
+        while getgenv().AutoMobs do
+            pcall(function()
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+
+                local Bosses = workspace:FindFirstChild("Bosses")
+                if not Bosses then return end
+
+                local nearest = nil
+                local nearestDist = math.huge
+
+                for _, mob in ipairs(Bosses:GetDescendants()) do
+                    if mob:IsA("Model") and mob:FindFirstChild("HumanoidRootPart") then
+                        local dist = (mob.HumanoidRootPart.Position - hrp.Position).Magnitude
+                        if dist < nearestDist then
+                            nearestDist = dist
+                            nearest = mob.HumanoidRootPart
                         end
                     end
-                end)
-                task.wait(0.5)
-            end
-        end)
+                end
+
+                -- UPDATE POSISI SETIAP 0.1 DETIK (TANPA KONDISI YANG BIKIN HANG)
+                if nearest then
+                    local offset
+                    if mobPosition == "Above" then
+                        offset = Vector3.new(0, setDistance, 0)
+                        hrp.Anchored = true
+                        hrp.CFrame = CFrame.lookAt(
+                            nearest.Position + offset,
+                            nearest.Position
+                        )
+                    elseif mobPosition == "Front" then
+                        offset = Vector3.new(0, 0, setDistance)
+                        hrp.Anchored = true
+                        hrp.CFrame = CFrame.lookAt(
+                            nearest.Position + offset,
+                            nearest.Position
+                        )
+                    end
+                end
+            end)
+            task.wait(0.1)
+        end
+
+        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then hrp.Anchored = false end
+    end)
+end
+
+TabFight:CreateToggle({
+    Name         = "Auto Mobs",
+    CurrentValue = false,
+    Callback     = function(v)
+        getgenv().AutoMobs = v
+        if v then
+            startMobs()
+        else
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then hrp.Anchored = false end
+        end
+    end
+})
+
+-- ========================
+-- AUTO ATTACK
+-- ========================
+local function startAttack()
+    task.spawn(function()
+        while getgenv().AutoAttack do
+            pcall(function()
+                local btn = LocalPlayer.PlayerGui:FindFirstChild("HUD")
+                if not btn then return end
+                btn = btn:FindFirstChild("TopBar")
+                if not btn then return end
+                btn = btn:FindFirstChild("ClickToAttack")
+                if not btn then return end
+
+                if btn.Visible then
+                    local x = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
+                    local y = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
+                    VIM:SendMouseButtonEvent(x, y, 0, true, game, 1)
+                    VIM:SendMouseButtonEvent(x, y, 0, false, game, 1)
+                end
+            end)
+            task.wait(0.2)
+        end
+    end)
+end
+
+TabFight:CreateToggle({
+    Name         = "Auto Attack",
+    CurrentValue = false,
+    Callback     = function(v)
+        getgenv().AutoAttack = v
+        if v then startAttack() end
     end
 })
 
@@ -141,7 +217,7 @@ local function applyToCharacter(character)
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if humanoid then
         humanoid.MaxHealth = math.huge
-        humanoid.Health = math.huge
+        humanoid.Health    = math.huge
     end
     for _, part in ipairs(character:GetDescendants()) do
         if part:IsA("BasePart") then
@@ -160,19 +236,6 @@ local function enableGodMode()
         applyToCharacter(character)
     end)
     table.insert(godConnections, conn)
-    task.spawn(function()
-        while getgenv().GodMode do
-            pcall(function()
-                local humanoid = LocalPlayer.Character
-                    and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    humanoid.MaxHealth = math.huge
-                    humanoid.Health = math.huge
-                end
-            end)
-            task.wait(0.1)
-        end
-    end)
 end
 
 local function disableGodMode()
@@ -180,58 +243,270 @@ local function disableGodMode()
         conn:Disconnect()
     end
     godConnections = {}
-    if LocalPlayer.Character then
-        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.MaxHealth = 100
-            humanoid.Health = 100
-        end
-    end
 end
 
-Main:CreateToggle({
-    Name = "God Mode",
+TabFight:CreateToggle({
+    Name         = "God Mode",
     CurrentValue = false,
-    Callback = function(v)
+    Callback     = function(v)
         getgenv().GodMode = v
-        if v then enableGodMode() else disableGodMode() end
+        if v then
+            enableGodMode()
+        else
+            disableGodMode()
+        end
+    end
+})
+
+-- ==================================================
+-- TAB: MAIN (untuk fitur umum)
+-- ==================================================
+local TabMain = Win:CreateTab("Main")
+
+-- ========================
+-- BONUS TRAIN / x2 Train (copy persis dari original startTrain)
+-- ========================
+local function startTrain()
+    task.spawn(function()
+        while getgenv().BonusTrain do
+            pcall(function()
+                local char = LocalPlayer.Character
+                local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+                local backpack = LocalPlayer:FindFirstChild("Backpack")
+                if not humanoid or not backpack then return end
+
+                for _, tool in ipairs(backpack:GetChildren()) do
+                    if tool:IsA("Tool") and tool:GetAttribute("TrainToolType") ~= nil then
+                        humanoid:EquipTool(tool)
+                        break
+                    end
+                end
+
+                local btn = LocalPlayer.PlayerGui:FindFirstChild("SpeedEffect")
+                if not btn then return end
+                btn = btn:FindFirstChild("LeftContainer")
+                if not btn then return end
+                btn = btn:FindFirstChild("Currency")
+                if not btn then return end
+                btn = btn:FindFirstChild("Speed")
+                if not btn then return end
+                btn = btn:FindFirstChild("x2Speed")
+                if not btn then return end
+
+                if btn.Visible then
+                    local realBtn = btn:FindFirstChild("Button")
+                    if realBtn then
+                        for _, conn in pairs(getconnections(realBtn.Activated)) do
+                            pcall(function() conn.Function() end)
+                        end
+                    end
+                end
+            end)
+            task.wait(0.1)
+        end
+
+        pcall(function()
+            LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):UnequipTools()
+        end)
+    end)
+end
+
+-- ========================
+-- BONUS TRAIN / x2 Train (copy persis dari original startTrain)
+-- ========================
+local function startTrain()
+    task.spawn(function()
+        while getgenv().BonusTrain do
+            pcall(function()
+                local char = LocalPlayer.Character
+                local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+                local backpack = LocalPlayer:FindFirstChild("Backpack")
+                if not humanoid or not backpack then return end
+
+                for _, tool in ipairs(backpack:GetChildren()) do
+                    if tool:IsA("Tool") and tool:GetAttribute("TrainToolType") ~= nil then
+                        humanoid:EquipTool(tool)
+                        break
+                    end
+                end
+
+                local btn = LocalPlayer.PlayerGui:FindFirstChild("SpeedEffect")
+                if not btn then return end
+                btn = btn:FindFirstChild("LeftContainer")
+                if not btn then return end
+                btn = btn:FindFirstChild("Currency")
+                if not btn then return end
+                btn = btn:FindFirstChild("Speed")
+                if not btn then return end
+                btn = btn:FindFirstChild("x2Speed")
+                if not btn then return end
+
+                if btn.Visible then
+                    local realBtn = btn:FindFirstChild("Button")
+                    if realBtn then
+                        for _, conn in pairs(getconnections(realBtn.Activated)) do
+                            pcall(function() conn.Function() end)
+                        end
+                    end
+                end
+            end)
+            task.wait(0.1)
+        end
+
+        pcall(function()
+            LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):UnequipTools()
+        end)
+    end)
+end
+
+TabMain:CreateToggle({
+    Name         = "Bonus Train (x2 Speed)",
+    CurrentValue = false,
+    Callback     = function(v)
+        getgenv().BonusTrain = v
+        if v then
+            startTrain()
+        else
+            pcall(function()
+                LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):UnequipTools()
+            end)
+        end
+    end
+})
+
+-- ========================
+-- COLLECT CASH (copy persis dari original startCash)
+-- ========================
+local function startCash()
+    task.spawn(function()
+        while getgenv().CollectCash do
+            pcall(function()
+                local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+
+                local Plots = workspace:FindFirstChild("Plots")
+                if not Plots then return end
+
+                for _, folder in ipairs(Plots:GetChildren()) do
+                    for _, model in ipairs(folder:GetChildren()) do
+                        if isMyPlot(model) then
+                            local containers = model:FindFirstChild("Containers")
+                            if containers then
+                                for _, obj in ipairs(containers:GetDescendants()) do
+                                    if obj.Name == "Collection" then
+                                        local pad = obj:FindFirstChild("CollectionPad")
+                                        if pad then
+                                            firetouchinterest(hrp, pad, 0)
+                                            task.wait()
+                                            firetouchinterest(hrp, pad, 1)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+            task.wait(2)
+        end
+    end)
+end
+
+-- ========================
+-- COLLECT CASH
+-- ========================
+local function startCash()
+    task.spawn(function()
+        while getgenv().CollectCash do
+            pcall(function()
+                local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+
+                local Plots = workspace:FindFirstChild("Plots")
+                if not Plots then return end
+
+                for _, folder in ipairs(Plots:GetChildren()) do
+                    for _, model in ipairs(folder:GetChildren()) do
+                        if isMyPlot(model) then
+                            local containers = model:FindFirstChild("Containers")
+                            if containers then
+                                for _, obj in ipairs(containers:GetDescendants()) do
+                                    if obj.Name == "Collection" then
+                                        local pad = obj:FindFirstChild("CollectionPad")
+                                        if pad then
+                                            firetouchinterest(hrp, pad, 0)
+                                            task.wait()
+                                            firetouchinterest(hrp, pad, 1)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+            task.wait(2)
+        end
+    end)
+end
+
+TabMain:CreateToggle({
+    Name         = "Collect Cash",
+    CurrentValue = false,
+    Callback     = function(v)
+        getgenv().CollectCash = v
+        if v then startCash() end
     end
 })
 
 -- ========================
 -- AUTO REBIRTH
 -- ========================
-Main:CreateToggle({
-    Name = "Auto Rebirth",
-    CurrentValue = false,
-    Callback = function(v)
-        getgenv().AutoRebirth = v
-        task.spawn(function()
-            while getgenv().AutoRebirth and not destroying do
-                pcall(function()
+local function startRebirth()
+    task.spawn(function()
+        while getgenv().AutoRebirth do
+            pcall(function()
+                local rebirthBtn = LocalPlayer.PlayerGui:FindFirstChild("HUD")
+                if not rebirthBtn then return end
+                rebirthBtn = rebirthBtn:FindFirstChild("LeftButtons")
+                if not rebirthBtn then return end
+                rebirthBtn = rebirthBtn:FindFirstChild("Rebirth")
+                if not rebirthBtn then return end
+                rebirthBtn = rebirthBtn:FindFirstChild("Frame")
+                if not rebirthBtn then return end
+
+                if rebirthBtn.Visible then
                     RebirthRemote:InvokeServer()
-                end)
-                task.wait(5)
-            end
-        end)
+                end
+            end)
+            task.wait(1)
+        end
+    end)
+end
+
+TabMain:CreateToggle({
+    Name         = "Auto Rebirth",
+    CurrentValue = false,
+    Callback     = function(v)
+        getgenv().AutoRebirth = v
+        if v then startRebirth() end
     end
 })
 
 -- ========================
--- AUTO UPGRADE ALL
+-- AUTO CLAIM ALL GIFT
 -- ========================
-Main:CreateToggle({
-    Name = "Auto Upgrade All",
+TabMain:CreateToggle({
+    Name         = "Auto Claim All Gift",
     CurrentValue = false,
-    Callback = function(v)
-        getgenv().AutoUpgradeAll = v
+    Callback     = function(v)
+        getgenv().AutoClaimGift = v
         task.spawn(function()
-            while getgenv().AutoUpgradeAll and not destroying do
-                for i = 1, 30 do
-                    if not getgenv().AutoUpgradeAll then break end
+            while getgenv().AutoClaimGift do
+                for i = 1, 12 do
+                    if not getgenv().AutoClaimGift then break end
                     pcall(function()
-                        local args = {tostring(i)}
-                        UpgradeBrainrot:InvokeServer(unpack(args))
+                        ClaimGift:InvokeServer(i)
                     end)
                     task.wait(0.1)
                 end
@@ -242,35 +517,67 @@ Main:CreateToggle({
 })
 
 -- ========================
--- AUTO UPGRADE SELECTED SLOT
+-- ANTI AFK
 -- ========================
-Main:CreateDropdown({
-    Name = "Select Slot",
-    Options = {
-        "1","2","3","4","5","6","7","8","9","10",
-        "11","12","13","14","15","16","17","18","19","20",
-        "21","22","23","24","25","26","27","28","29","30"
-    },
-    CurrentOption = "1",
-    Callback = function(v)
-        selectedSlot = tonumber(v)
+TabMain:CreateToggle({
+    Name         = "Anti AFK",
+    CurrentValue = false,
+    Callback     = function(v)
+        getgenv().AntiAfk = v
+        task.spawn(function()
+            while getgenv().AntiAfk do
+                pcall(function()
+                    VirtualUser:CaptureController()
+                    VirtualUser:ClickButton2(Vector2.new())
+                end)
+                task.wait(60)
+            end
+        end)
     end
 })
 
-Main:CreateToggle({
-    Name = "Auto Upgrade (Selected Slot)",
+-- ==================================================
+-- TAB: UPGRADE
+-- ==================================================
+local TabUpgrade = Win:CreateTab("Upgrade")
+
+-- ========================
+-- AUTO UPGRADE ALL
+-- ========================
+local function startUpgrade()
+    task.spawn(function()
+        while getgenv().AutoUpgradeAll do
+            pcall(function()
+                local Plots = workspace:FindFirstChild("Plots")
+                if not Plots then return end
+
+                for _, folder in ipairs(Plots:GetChildren()) do
+                    for _, model in ipairs(folder:GetChildren()) do
+                        if isMyPlot(model) then
+                            local containers = model:FindFirstChild("Containers")
+                            if containers then
+                                for _, obj in ipairs(containers:GetDescendants()) do
+                                    if obj.Name == "Collection" then
+                                        UpgradeBrainrot:InvokeServer(obj.Parent.Name)
+                                        task.wait(0.1)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+            task.wait(1)
+        end
+    end)
+end
+
+TabUpgrade:CreateToggle({
+    Name         = "Auto Upgrade All",
     CurrentValue = false,
-    Callback = function(v)
-        getgenv().AutoUpgrade = v
-        task.spawn(function()
-            while getgenv().AutoUpgrade and not destroying do
-                pcall(function()
-                    local args = {tostring(selectedSlot)}
-                    UpgradeBrainrot:InvokeServer(unpack(args))
-                end)
-                task.wait(3)
-            end
-        end)
+    Callback     = function(v)
+        getgenv().AutoUpgradeAll = v
+        if v then startUpgrade() end
     end
 })
 
@@ -278,23 +585,22 @@ Main:CreateToggle({
 -- AUTO BUY ALL AURA
 -- ========================
 local auras = {
-    "justice_aura", "azure_aura", "verdant_aura", "solar_aura",
-    "cursed_aura", "ancient_aura", "venom_aura", "holy_aura",
-    "doom_aura", "reaper_aura"
+    "justice_aura", "azure_aura",   "verdant_aura", "solar_aura",
+    "cursed_aura",  "ancient_aura", "venom_aura",   "holy_aura",
+    "doom_aura",    "reaper_aura"
 }
 
-Main:CreateToggle({
-    Name = "Auto Buy All Aura",
+TabUpgrade:CreateToggle({
+    Name         = "Auto Buy All Aura",
     CurrentValue = false,
-    Callback = function(v)
+    Callback     = function(v)
         getgenv().AutoBuyAura = v
         task.spawn(function()
-            while getgenv().AutoBuyAura and not destroying do
+            while getgenv().AutoBuyAura do
                 for _, aura in ipairs(auras) do
                     if not getgenv().AutoBuyAura then break end
                     pcall(function()
-                        local args = {aura}
-                        BuySkin:InvokeServer(unpack(args))
+                        BuySkin:InvokeServer(aura)
                     end)
                     task.wait(0.1)
                 end
@@ -308,26 +614,25 @@ Main:CreateToggle({
 -- AUTO BUY ALL DUMMY
 -- ========================
 local dummies = {
-    "basic_dummy", "armored_dummy", "golden_dummy", "diamond_dummy",
-    "infernal_dummy", "spike_dummy", "boneca_dummy", "noob_dummy",
-    "ta_ta_dummy", "glitched_dummy", "ocean_dummy", "galactic_dummy",
-    "paw_dummy", "monitor_dummy", "hacked_dummy", "corrupted_dummy",
-    "67_dummy", "devilball_dummy", "magia_dummy", "bomba_dummy",
+    "basic_dummy",    "armored_dummy",   "golden_dummy",   "diamond_dummy",
+    "infernal_dummy", "spike_dummy",     "boneca_dummy",   "noob_dummy",
+    "ta_ta_dummy",    "glitched_dummy",  "ocean_dummy",    "galactic_dummy",
+    "paw_dummy",      "monitor_dummy",   "hacked_dummy",   "corrupted_dummy",
+    "67_dummy",       "devilball_dummy", "magia_dummy",    "bomba_dummy",
     "capuchino_dummy"
 }
 
-Main:CreateToggle({
-    Name = "Auto Buy All Dummy",
+TabUpgrade:CreateToggle({
+    Name         = "Auto Buy All Dummy",
     CurrentValue = false,
-    Callback = function(v)
+    Callback     = function(v)
         getgenv().AutoBuyDummy = v
         task.spawn(function()
-            while getgenv().AutoBuyDummy and not destroying do
+            while getgenv().AutoBuyDummy do
                 for _, dummy in ipairs(dummies) do
                     if not getgenv().AutoBuyDummy then break end
                     pcall(function()
-                        local args = {dummy}
-                        BuyTrainTool:InvokeServer(unpack(args))
+                        BuyTrainTool:InvokeServer(dummy)
                     end)
                     task.wait(0.1)
                 end
@@ -337,38 +642,15 @@ Main:CreateToggle({
     end
 })
 
--- ========================
--- AUTO CLAIM ALL GIFT
--- ========================
-Main:CreateToggle({
-    Name = "Auto Claim All Gift",
-    CurrentValue = false,
-    Callback = function(v)
-        getgenv().AutoClaimGift = v
-        task.spawn(function()
-            while getgenv().AutoClaimGift and not destroying do
-                for i = 1, 12 do
-                    if not getgenv().AutoClaimGift then break end
-                    pcall(function()
-                        local args = {i}
-                        ClaimGift:InvokeServer(unpack(args))
-                    end)
-                    task.wait(0.1)
-                end
-                task.wait(3)
-            end
-        end)
-    end
-})
-
--- ========================
--- CONFIRM
--- ========================
+-- ==================================================
+-- CONFIRM + LOAD CONFIG (HARUS DI AKHIR!)
+-- ==================================================
 Win:Confirm({
-    Title = "Rilzz Hub",
-    Content = "Script Loaded Successfully!",
+    Title     = "Rilzz Hub",
+    Content   = "Script Loaded Successfully!",
     OnConfirm = function() print("Loaded") end,
-    OnCancel = function() print("Cancelled") end,
+    OnCancel  = function() print("Cancelled") end,
 })
 
+-- HARUS PALING AKHIR!
 Rilzz:LoadConfiguration()
