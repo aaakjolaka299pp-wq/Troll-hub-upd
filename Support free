@@ -3,7 +3,8 @@ local SupportedMaps = {
     [105633123928294] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/InsidFRE",
     [90247694815078] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Fight",
     [75888315541325] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Dupe%20pushrock",
-    [135882949571046] = "https://pastefy.app/GAxFfLvc/raw"
+    [135882949571046] = "https://pastefy.app/GAxFfLvc/raw", 
+    [84575720768520] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/RushLuckyBloks"
 }
 
 local scriptUrl = SupportedMaps[game.PlaceId]
