@@ -1,0 +1,168 @@
+local Library = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/liebertsx/Tora-Library/main/src/librarynew", true
+))()
+
+local Win = Library:CreateWindow("Fish a Slime ")
+
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Remotes = game:GetService("ReplicatedStorage"):WaitForChild("Remotes")
+
+local State = {
+    AutoCast = false,
+    AutoDoubleStrength = false,
+    AutoUpgradeBase = false,
+    AutoCollectCash = false,
+    AutoRebirth = false
+}
+
+local castDelay = 0.1
+
+-- ========================
+-- FISHING
+-- ========================
+Win:AddLabel({ text = "── Fishing ──" })
+
+Win:AddToggle({
+    text = "Auto Cast",
+    flag = "auto_cast",
+    state = false,
+    callback = function(v)
+        State.AutoCast = v
+        if v then
+            task.spawn(function()
+                while State.AutoCast do
+                    pcall(function()
+                        Remotes.OnCast:InvokeServer(1)
+                        task.wait(castDelay)
+                        Remotes.onSwim:InvokeServer()
+                        task.wait(castDelay)
+                        Remotes.onSwimComplete:InvokeServer(false, false)
+                    end)
+                    task.wait(castDelay)
+                end
+            end)
+        end
+    end
+})
+
+Win:AddSlider({
+    text = "Cast Delay",
+    flag = "cast_delay",
+    value = 0.1,
+    min = 0.1,
+    max = 5,
+    callback = function(v)
+        castDelay = v
+    end
+})
+
+-- ========================
+-- UPGRADES & REBIRTH
+-- ========================
+Win:AddLabel({ text = "── Upgrades & Rebirth ──" })
+
+Win:AddToggle({
+    text = "Auto Double Strength",
+    flag = "auto_double_strength",
+    state = false,
+    callback = function(v)
+        State.AutoDoubleStrength = v
+        if v then
+            task.spawn(function()
+                while State.AutoDoubleStrength do
+                    pcall(function()
+                        Remotes.doubleStrength:FireServer()
+                    end)
+                    task.wait(0.0001)
+                end
+            end)
+        end
+    end
+})
+
+Win:AddToggle({
+    text = "Auto Upgrade Base",
+    flag = "auto_upgrade_base",
+    state = false,
+    callback = function(v)
+        State.AutoUpgradeBase = v
+        if v then
+            task.spawn(function()
+                while State.AutoUpgradeBase do
+                    pcall(function()
+                        Remotes.MenuInteraction:InvokeServer("UpgradeSlot")
+                    end)
+                    task.wait(0.5)
+                end
+            end)
+        end
+    end
+})
+
+Win:AddToggle({
+    text = "Auto Rebirth",
+    flag = "auto_rebirth",
+    state = false,
+    callback = function(v)
+        State.AutoRebirth = v
+        if v then
+            task.spawn(function()
+                while State.AutoRebirth do
+                    pcall(function()
+                        Remotes.Rebirth:InvokeServer()
+                    end)
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end
+})
+
+-- ========================
+-- CASH
+-- ========================
+Win:AddLabel({ text = "── Cash ──" })
+
+Win:AddToggle({
+    text = "Auto Collect Cash",
+    flag = "auto_collect_cash",
+    state = false,
+    callback = function(v)
+        State.AutoCollectCash = v
+        if v then
+            task.spawn(function()
+                while State.AutoCollectCash do
+                    pcall(function()
+                        for i = 1, 30 do
+                            if not State.AutoCollectCash then break end
+                            Remotes.Claim:InvokeServer(i)
+                            task.wait(0.05)
+                        end
+                    end)
+                    task.wait(0.5)
+                end
+            end)
+        end
+    end
+})
+
+-- ========================
+-- SETTINGS
+-- ========================
+Win:AddLabel({ text = "── Settings ──" })
+
+Win:AddButton({
+    text = "Rejoin Server",
+    flag = "rejoin",
+    callback = function()
+        for key in pairs(State) do
+            State[key] = false
+        end
+        task.wait(2)
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+    end
+})
+
+Library:Init()
