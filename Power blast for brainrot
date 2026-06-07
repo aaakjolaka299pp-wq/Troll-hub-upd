@@ -1,0 +1,215 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local RS = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/liebertsx/Tora-Library/main/src/librarynew"))()
+local window = library:CreateWindow("Rilzz Hub Nich Deck")
+
+-- ========================
+-- HELPERS
+-- ========================
+local function getHRP()
+    local char = player.Character or player.CharacterAdded:Wait()
+    return char:WaitForChild("HumanoidRootPart")
+end
+
+local function getMyLot()
+    for _, lot in pairs(workspace.Lots:GetChildren()) do
+        for _, v in pairs(lot:GetAttributes()) do
+            if v == player.Name or v == player.UserId then
+                return lot
+            end
+        end
+    end
+end
+
+local function tweenTo(targetCFrame)
+    local hrp = getHRP()
+    local tween = TweenService:Create(hrp, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {
+        CFrame = targetCFrame
+    })
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+-- ========================
+-- GUI
+-- ========================
+local playerNames = {}
+for _, p in pairs(Players:GetPlayers()) do
+    if p ~= player then
+        table.insert(playerNames, p.Name)
+    end
+end
+
+_G.targetPlayer = playerNames[1] or ""
+
+local playerList = window:AddList({
+    text = "Target Player",
+    values = playerNames,
+    value = _G.targetPlayer,
+    callback = function(val)
+        _G.targetPlayer = val
+        print("Target:", val)
+    end
+})
+
+_G.dupe = false
+
+window:AddToggle({
+    text = "Dupe",
+    value = false,
+    callback = function(val)
+        _G.dupe = val
+        print(_G.dupe and "Dupe ON" or "Dupe OFF")
+    end
+})
+
+library:Init()
+
+Players.PlayerAdded:Connect(function(p)
+    if p ~= player then playerList:AddValue(p.Name) end
+end)
+Players.PlayerRemoving:Connect(function(p)
+    playerList:RemoveValue(p.Name)
+end)
+
+-- ========================
+-- MAIN DUPE LOOP
+-- ========================
+coroutine.wrap(function()
+    while true do
+        task.wait(0.1)
+        if not _G.dupe then continue end
+
+        pcall(function()
+            local myLot = getMyLot()
+            if not myLot then return end
+
+            -- ====================
+            -- PHASE 1: PLACE SEMUA
+            -- ====================
+            while _G.dupe do
+                local placePrompt = nil
+                for _, v in pairs(myLot:GetDescendants()) do
+                    if v:IsA("ProximityPrompt") and v.ActionText == "Place Here" then
+                        placePrompt = v
+                        break
+                    end
+                end
+
+                if not placePrompt then
+                    print("Place habis, lanjut pickup")
+                    break
+                end
+
+                -- Tween ke prompt
+                tweenTo(placePrompt.Parent.CFrame)
+                task.wait(0.15)
+
+                -- Tween ke prompt
+                tweenTo(placePrompt.Parent.CFrame)
+                task.wait(0.15)
+
+                -- Fire place
+                fireproximityprompt(placePrompt)
+                print("Placed!")
+                task.wait(0.5)
+
+                -- Reset
+                player.Character:FindFirstChildOfClass("Humanoid").Health = 0
+
+                -- Blast aktif setelah reset
+                local blastActive = true
+                task.spawn(function()
+                    while blastActive do
+                        pcall(function()
+                            RS.Remotes.GetBlastStyleData:InvokeServer()
+                        end)
+                        task.wait(0.01)
+                    end
+                end)
+
+                -- Tunggu respawn, lalu blast berhenti
+                player.CharacterAdded:Wait()
+                blastActive = false
+                task.wait(0.1)
+            end
+
+            -- ====================
+            -- PHASE 2: PICKUP SEMUA
+            -- ====================
+            while _G.dupe do
+                local pickupPrompt = nil
+                for _, v in pairs(myLot:GetDescendants()) do
+                    if v:IsA("ProximityPrompt") and v.ActionText == "Pick Up" then
+                        pickupPrompt = v
+                        break
+                    end
+                end
+
+                if not pickupPrompt then
+                    print("Pickup habis, lanjut gift")
+                    break
+                end
+
+                local tpTarget = pickupPrompt.Parent.Parent
+                if tpTarget and tpTarget:IsA("BasePart") then
+                    tweenTo(tpTarget.CFrame + Vector3.new(0, 3, 0))
+                end
+                task.wait(0.1)
+                fireproximityprompt(pickupPrompt)
+                print("Picked up!")
+                task.wait(0.2)
+            end
+
+            -- ====================
+            -- PHASE 3: GIFT SEMUA (stop saat sisa 1)
+            -- ====================
+            while _G.dupe do
+                local target = Players:FindFirstChild(_G.targetPlayer)
+                if not target or not target.Character then
+                    print("Target tidak ditemukan!")
+                    break
+                end
+
+                local backpack = player:FindFirstChild("Backpack")
+                if not backpack then break end
+
+                -- Hitung tool bukan aura
+                local brainrotTools = {}
+                for _, tool in pairs(backpack:GetChildren()) do
+                    if tool:IsA("Tool") and not tool.Name:lower():find("aura") then
+                        table.insert(brainrotTools, tool)
+                    end
+                end
+
+                -- Stop kalau sisa 1
+                if #brainrotTools <= 1 then
+                    print("Brainrot sisa 1, balik ke place!")
+                    break
+                end
+
+                -- Tween ke target
+                local targetHRP = target.Character:FindFirstChild("HumanoidRootPart")
+                if targetHRP then
+                    tweenTo(targetHRP.CFrame + Vector3.new(3, 0, 0))
+                end
+                task.wait(0.1)
+
+                -- Equip + gift
+                local char = player.Character or player.CharacterAdded:Wait()
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid:EquipTool(brainrotTools[1])
+                    task.wait(0.2)
+                end
+
+                RS.Remotes.RequestGiftBrainrot:FireServer(target.UserId)
+                print("Gifted to:", target.Name, "| Sisa:", #brainrotTools - 1)
+                task.wait(0.5)
+            end
+        end)
+    end
+end)()
