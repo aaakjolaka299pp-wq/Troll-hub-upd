@@ -1,0 +1,480 @@
+local Rilzz = loadstring(game:HttpGet("https://pastefy.app/mPtQVFoh/raw?part=addon.lua"))()
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService  = game:GetService("UserInputService")
+local LocalPlayer       = game:GetService("Players").LocalPlayer
+
+local Shared   = ReplicatedStorage:WaitForChild("Shared")
+local Packages = Shared:WaitForChild("Packages")
+local Net      = Packages:WaitForChild("Net")
+
+local ClaimGold        = Net:WaitForChild("RE/ClaimGold")
+local UnlockSlot       = Net:WaitForChild("RE/UnlockSlot")
+local UpgradeBrainrot  = Net:WaitForChild("RE/UpgradeBrainrot")
+local RebirthUp        = Net:WaitForChild("RE/RebirthUp")
+local DroneLevelUp     = Net:WaitForChild("RE/DroneLevelUp")
+local ShieldLevelUp    = Net:WaitForChild("RE/ShieldLevelUp")
+local ShotLevelUp      = Net:WaitForChild("RE/ShotLevelUp")
+local SellAllBrainrot  = Net:WaitForChild("RE/SellAllBrainrot")
+local ClaimOnlineReward = Net:WaitForChild("RF/ClaimOnlineReward")
+local BrainrotAttack   = Net:WaitForChild("RE/BrainrotAttack")
+local DroneRequest     = Net:WaitForChild("RF/DroneRequest")
+local DroneCapture     = Net:WaitForChild("RF/DroneCapture")
+local DroneClaim       = Net:WaitForChild("RE/DroneClaim")
+
+-- ========================
+-- STATE
+-- ========================
+local State = {
+    AutoCash          = false,
+    AutoUpgradeBase   = false,
+    AutoBrainrot      = false,
+    AutoRebirth       = false,
+    AutoDrone         = false,
+    AutoShield        = false,
+    AutoSniper        = false,
+    InstantClaim      = false,
+    ClaimMode         = "Random All",
+    BrainrotPad       = "All",
+    SniperAmount      = 1,
+    AutoSell          = false,
+    AutoRewards       = false,
+}
+
+-- ========================
+-- HELPERS
+-- ========================
+local startPos = CFrame.new(281.00350952148, 268.92413330078, 1600.3850097656,
+    .65544629096985, 1.049571949352e-07, -0.75524175167084,
+    -6.8983716516868e-08, 1, 7.9103237737854e-08,
+    .75524175167084, 2.5145963089557e-10, .65544629096985)
+local endPos = Vector3.new(241.53810119629, 178.41264343262, 1225.9730224609)
+
+local processing = {}
+
+local function getBrainrotFolder()
+    local GameFolder = workspace:FindFirstChild("GameFolder")
+    return GameFolder and GameFolder:FindFirstChild("BrainrotModels")
+end
+
+local function hasMutation(model)
+    return model:FindFirstChild("MutationHighLight") ~= nil
+        or model:FindFirstChild("MutationHighLight", true) ~= nil
+end
+
+local function getAllBrainrots()
+    local result = {}
+    local folder = getBrainrotFolder()
+    if folder then
+        for _, child in ipairs(folder:GetChildren()) do
+            if child:IsA("Model") then
+                result[#result + 1] = child
+            end
+        end
+    end
+    if getnilinstances then
+        for _, inst in next, getnilinstances() do
+            if inst.ClassName == "Model" and #inst.Name == 36 then
+                result[#result + 1] = inst
+            end
+        end
+    end
+    return result
+end
+
+local function getBackpackBrainrots()
+    local result = {}
+    local Backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not Backpack then return result end
+    for _, tool in ipairs(Backpack:GetChildren()) do
+        if #tool.Name == 36 then
+            result[#result + 1] = tool.Name
+        end
+    end
+    return result
+end
+
+local function unequipAll()
+    for i = 1, 100 do
+        pcall(function()
+            UnlockSlot:FireServer(i)
+        end)
+    end
+end
+
+local function placeAll()
+    local brainrots = getBackpackBrainrots()
+    for i = 1, 100 do
+        local name = brainrots[i]
+        if name then
+            pcall(function()
+                UpgradeBrainrot:FireServer(name)
+            end)
+            task.wait(0.05)
+        end
+    end
+end
+
+-- ========================
+-- SNIPE FUNCTION (Fix gal52)
+-- ========================
+local function snipeBrainrot(model)
+    local Name = model.Name
+    pcall(function()
+        BrainrotAttack:FireServer(Name)
+    end)
+    task.wait(0.03)
+
+    local droneUid = nil
+    for i = 1, 8 do
+        local ok, result = pcall(function()
+            return DroneRequest:InvokeServer({
+                startPos   = startPos,
+                endPos     = endPos,
+                startTick  = tick(),
+                brainrotUid = Name
+            })
+        end)
+        if ok and result then
+            if type(result) == "string" then
+                droneUid = result
+            elseif type(result) == "table" then
+                droneUid = result.droneUid or result.DroneUid or (Name .. "Drone")
+            end
+            if droneUid then break end
+        end
+        task.wait(0.05)
+    end
+
+    if not droneUid then return false end
+
+    for i = 1, 4 do
+        local ok2 = pcall(function()
+            return DroneCapture:InvokeServer(Name, droneUid)
+        end)
+        if ok2 then
+            pcall(function() DroneClaim:FireServer(droneUid) end)
+            return true
+        end
+        task.wait(0.05)
+    end
+
+    pcall(function() DroneClaim:FireServer(droneUid) end)
+    return true
+end
+
+-- ========================
+-- AUTO CLAIM LOOP (Fix gal63)
+-- ========================
+task.spawn(function()
+    while true do
+        if State.InstantClaim then
+            local mutationOnly = State.ClaimMode == "Random Mutation"
+            for _, model in ipairs(getAllBrainrots()) do
+                if not processing[model.Name] then
+                    local shouldClaim = not mutationOnly or hasMutation(model)
+                    if shouldClaim then
+                        processing[model.Name] = true
+                        task.spawn(function()
+                            pcall(snipeBrainrot, model)
+                            processing[model.Name] = nil
+                        end)
+                    end
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+-- ========================
+-- AUTO LOOPS
+-- ========================
+
+-- Auto Cash
+task.spawn(function()
+    while true do
+        if State.AutoCash then
+            for i = 1, 100 do
+                if not State.AutoCash then break end
+                pcall(function() ClaimGold:FireServer(i) end)
+            end
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- Auto Upgrade Base
+task.spawn(function()
+    while true do
+        if State.AutoUpgradeBase then
+            for i = 1, 112 do
+                if not State.AutoUpgradeBase then break end
+                pcall(function() UnlockSlot:FireServer(i) end)
+                task.wait(0.05)
+            end
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- Auto Upgrade Brainrot
+task.spawn(function()
+    while true do
+        if State.AutoBrainrot then
+            if State.BrainrotPad == "All" then
+                for i = 1, 100 do
+                    if not State.AutoBrainrot then break end
+                    pcall(function() UpgradeBrainrot:FireServer(i) end)
+                    task.wait(0.05)
+                end
+            else
+                local pad = tonumber(State.BrainrotPad)
+                if pad then
+                    pcall(function() UpgradeBrainrot:FireServer(pad) end)
+                end
+            end
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- Auto Rebirth
+task.spawn(function()
+    while true do
+        if State.AutoRebirth then
+            pcall(function() RebirthUp:FireServer() end)
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- Auto Drone
+task.spawn(function()
+    while true do
+        if State.AutoDrone then
+            pcall(function() DroneLevelUp:FireServer(1) end)
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- Auto Shield
+task.spawn(function()
+    while true do
+        if State.AutoShield then
+            pcall(function() ShieldLevelUp:FireServer(1) end)
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- Auto Sniper
+task.spawn(function()
+    while true do
+        if State.AutoSniper then
+            pcall(function() ShotLevelUp:FireServer(State.SniperAmount) end)
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- Auto Sell
+task.spawn(function()
+    while true do
+        if State.AutoSell then
+            pcall(function() SellAllBrainrot:FireServer() end)
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- Auto Rewards
+task.spawn(function()
+    while true do
+        if State.AutoRewards then
+            for i = 1, 9 do
+                if not State.AutoRewards then break end
+                pcall(function() ClaimOnlineReward:InvokeServer(i) end)
+            end
+        end
+        task.wait(1)
+    end
+end)
+
+-- ========================
+-- GUI
+-- ========================
+local ViewportSize = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+
+local Win = Rilzz:CreateWindow({
+    Name              = "Brainrot Sniper",
+    Version           = "v1.0",
+    ToggleUIKeybind   = "RightShift",
+    Theme             = "Purple",
+    Credits           = { Author = "localhub" },
+    ConfigurationSaving = { Enabled = true, FileName = "BrainrotSniper_localhub" },
+    Features = {
+        Watermark          = true,
+        FPSCounter         = true,
+        RippleEffect       = true,
+        AnnouncementBanner = "Brainrot Sniper — by RilzzHub",
+        ClockWidget        = true,
+    }
+})
+
+local PadOptions = {"All"}
+for i = 1, 100 do PadOptions[#PadOptions + 1] = tostring(i) end
+
+-- ========================
+-- TAB: MAIN
+-- ========================
+local TabMain = Win:CreateTab("Main")
+
+TabMain:CreateSection("Brainrot")
+
+TabMain:CreateToggle({
+    Name         = "Auto Get Brainrot Instant",
+    CurrentValue = false,
+    Flag         = "instant_claim",
+    Callback     = function(v) State.InstantClaim = v end
+})
+
+TabMain:CreateDropdown({
+    Name          = "Claim Mode",
+    Options       = {"Random All", "Random Mutation"},
+    CurrentOption = {"Random All"},
+    Flag          = "claim_mode",
+    Callback      = function(v) State.ClaimMode = v[1] end
+})
+
+TabMain:CreateSection("Farm")
+
+TabMain:CreateToggle({
+    Name         = "Auto Cash",
+    CurrentValue = false,
+    Flag         = "auto_cash",
+    Callback     = function(v) State.AutoCash = v end
+})
+
+TabMain:CreateToggle({
+    Name         = "Auto Rebirth",
+    CurrentValue = false,
+    Flag         = "auto_rebirth",
+    Callback     = function(v) State.AutoRebirth = v end
+})
+
+TabMain:CreateToggle({
+    Name         = "Auto Sell",
+    CurrentValue = false,
+    Flag         = "auto_sell",
+    Callback     = function(v) State.AutoSell = v end
+})
+
+TabMain:CreateToggle({
+    Name         = "Auto Claim Rewards",
+    CurrentValue = false,
+    Flag         = "auto_rewards",
+    Callback     = function(v) State.AutoRewards = v end
+})
+
+-- ========================
+-- TAB: UPGRADES
+-- ========================
+local TabUpgrade = Win:CreateTab("Upgrades")
+
+TabUpgrade:CreateSection("Upgrades")
+
+TabUpgrade:CreateToggle({
+    Name         = "Auto Upgrade Base",
+    CurrentValue = false,
+    Flag         = "auto_base",
+    Callback     = function(v) State.AutoUpgradeBase = v end
+})
+
+TabUpgrade:CreateToggle({
+    Name         = "Auto Upgrade Brainrot",
+    CurrentValue = false,
+    Flag         = "auto_brainrot",
+    Callback     = function(v) State.AutoBrainrot = v end
+})
+
+TabUpgrade:CreateDropdown({
+    Name          = "Brainrot Pad",
+    Options       = PadOptions,
+    CurrentOption = {"All"},
+    Flag          = "brainrot_pad",
+    Callback      = function(v) State.BrainrotPad = v[1] end
+})
+
+TabUpgrade:CreateToggle({
+    Name         = "Auto Upgrade Sniper",
+    CurrentValue = false,
+    Flag         = "auto_sniper",
+    Callback     = function(v) State.AutoSniper = v end
+})
+
+TabUpgrade:CreateDropdown({
+    Name          = "Sniper Amount",
+    Options       = {"1", "5", "10"},
+    CurrentOption = {"1"},
+    Flag          = "sniper_amount",
+    Callback      = function(v) State.SniperAmount = tonumber(v[1]) or 1 end
+})
+
+TabUpgrade:CreateToggle({
+    Name         = "Auto Buy Drone",
+    CurrentValue = false,
+    Flag         = "auto_drone",
+    Callback     = function(v) State.AutoDrone = v end
+})
+
+TabUpgrade:CreateToggle({
+    Name         = "Auto Buy Shield",
+    CurrentValue = false,
+    Flag         = "auto_shield",
+    Callback     = function(v) State.AutoShield = v end
+})
+
+-- ========================
+-- TAB: PLACE
+-- ========================
+local TabPlace = Win:CreateTab("Place")
+
+TabPlace:CreateSection("Actions")
+
+TabPlace:CreateButton({
+    Name     = "Place Once",
+    Callback = function()
+        placeAll()
+    end
+})
+
+TabPlace:CreateButton({
+    Name     = "Unequip All",
+    Callback = function()
+        unequipAll()
+    end
+})
+
+-- ========================
+-- TAB: SETTINGS
+-- ========================
+local TabSettings = Win:CreateTab("Settings")
+
+TabSettings:CreateSection("About")
+TabSettings:CreateLabel("Brainrot Sniper • by RilzzHub")
+
+TabSettings:CreateKeybind({
+    Name           = "UI Toggle Key",
+    CurrentKeybind = "RightShift",
+    Flag           = "ui_toggle_key",
+    Callback       = function(v) end
+})
+
+TabSettings:CreateButton({
+    Name     = "Unload",
+    Callback = function() Win:Destroy() end
+})
+
+-- HARUS PALING AKHIR
+Rilzz:LoadConfiguration()
