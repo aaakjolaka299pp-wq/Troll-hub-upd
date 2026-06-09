@@ -69,12 +69,10 @@ local VARIANT_LABEL = {
     gold    = "GOLD",
     normal  = "NORM",
 }
--- Priority rank (untuk badge)
 local VARIANT_RANK = {
     astral=6, honey=5, blazing=4, poison=3, diamond=2, gold=1, normal=0
 }
 
--- State: hanya currentTweenPrompt (no pinned, no select)
 local currentTweenPrompt = nil
 
 -- ── MAIN FRAME ────────────────────────────────────────────────────
@@ -90,12 +88,10 @@ mainFrame.Visible = false
 mainFrame.Parent = scanGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 14)
 
--- Outer glow stroke
 local outerStroke = Instance.new("UIStroke", mainFrame)
 outerStroke.Color = Color3.fromRGB(50, 55, 120)
 outerStroke.Thickness = 1.5
 
--- ── GRADIENT BG ───────────────────────────────────────────────────
 local bgGrad = Instance.new("UIGradient", mainFrame)
 bgGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0,   Color3.fromRGB(10, 10, 22)),
@@ -103,7 +99,6 @@ bgGrad.Color = ColorSequence.new({
 })
 bgGrad.Rotation = 135
 
--- ── TOP BAR ───────────────────────────────────────────────────────
 local topBar = Instance.new("Frame", mainFrame)
 topBar.Size = UDim2.new(1, 0, 0, 40)
 topBar.Position = UDim2.new(0, 0, 0, 0)
@@ -111,7 +106,6 @@ topBar.BackgroundColor3 = Color3.fromRGB(12, 12, 26)
 topBar.BorderSizePixel = 0
 Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 14)
 
--- Gradient topbar
 local topGrad = Instance.new("UIGradient", topBar)
 topGrad.Color = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 18, 45)),
@@ -119,7 +113,6 @@ topGrad.Color = ColorSequence.new({
 })
 topGrad.Rotation = 90
 
--- Accent line bawah topbar
 local accent = Instance.new("Frame", topBar)
 accent.Size = UDim2.new(1, 0, 0, 2)
 accent.Position = UDim2.new(0, 0, 1, -2)
@@ -133,7 +126,6 @@ accentGrad.Color = ColorSequence.new({
 })
 accentGrad.Rotation = 0
 
--- Icon radar
 local radarIcon = Instance.new("TextLabel", topBar)
 radarIcon.Size = UDim2.fromOffset(30, 30)
 radarIcon.Position = UDim2.new(0, 8, 0, 5)
@@ -143,7 +135,6 @@ radarIcon.TextSize = 18
 radarIcon.Font = Enum.Font.Gotham
 radarIcon.TextColor3 = Color3.fromRGB(255, 255, 255)
 
--- Title
 local titleLbl = Instance.new("TextLabel", topBar)
 titleLbl.Size = UDim2.new(1, -110, 1, 0)
 titleLbl.Position = UDim2.new(0, 44, 0, 0)
@@ -154,7 +145,6 @@ titleLbl.TextSize = 13
 titleLbl.Font = Enum.Font.GothamBold
 titleLbl.TextXAlignment = Enum.TextXAlignment.Left
 
--- Subtitle kecil
 local subLbl = Instance.new("TextLabel", topBar)
 subLbl.Size = UDim2.new(1, -110, 0, 12)
 subLbl.Position = UDim2.new(0, 44, 1, -14)
@@ -165,7 +155,6 @@ subLbl.TextSize = 9
 subLbl.Font = Enum.Font.Gotham
 subLbl.TextXAlignment = Enum.TextXAlignment.Left
 
--- Counter badge (top right — geser kiri sedikit buat kasih ruang minimize btn)
 local counterBadge = Instance.new("Frame", topBar)
 counterBadge.Size = UDim2.fromOffset(58, 22)
 counterBadge.Position = UDim2.new(1, -128, 0.5, -11)
@@ -182,7 +171,6 @@ counterLbl.TextColor3 = Color3.fromRGB(100, 120, 200)
 counterLbl.TextSize = 10
 counterLbl.Font = Enum.Font.GothamBold
 
--- Minimize button (pojok kanan topbar)
 local minimizeBtn = Instance.new("TextButton", topBar)
 minimizeBtn.Name = "MinimizeBtn"
 minimizeBtn.Size = UDim2.fromOffset(56, 22)
@@ -198,7 +186,6 @@ local minStroke = Instance.new("UIStroke", minimizeBtn)
 minStroke.Color = Color3.fromRGB(50, 55, 120)
 minStroke.Thickness = 1
 
--- ── STATUS BAR ────────────────────────────────────────────────────
 local statusBar = Instance.new("Frame", mainFrame)
 statusBar.Size = UDim2.new(1, -16, 0, 24)
 statusBar.Position = UDim2.new(0, 8, 0, 44)
@@ -218,7 +205,6 @@ statusLbl.Font = Enum.Font.Gotham
 statusLbl.TextXAlignment = Enum.TextXAlignment.Left
 statusLbl.RichText = true
 
--- ── SCROLL AREA ───────────────────────────────────────────────────
 local scrollFrame = Instance.new("ScrollingFrame", mainFrame)
 scrollFrame.Size = UDim2.new(1, -10, 1, -76)
 scrollFrame.Position = UDim2.new(0, 5, 0, 73)
@@ -236,7 +222,6 @@ local listPad = Instance.new("UIPadding", scrollFrame)
 listPad.PaddingTop = UDim.new(0, 2)
 listPad.PaddingBottom = UDim.new(0, 4)
 
--- ── HELPER: buat card ─────────────────────────────────────────────
 local function makeCard(parent)
     local card = Instance.new("Frame", parent)
     card.Size = UDim2.new(1, -4, 0, 58)
@@ -248,7 +233,6 @@ local function makeCard(parent)
     cs.Color = Color3.fromRGB(35, 38, 65)
     cs.Thickness = 1
 
-    -- Left glow bar
     local bar = Instance.new("Frame", card)
     bar.Name = "ColorBar"
     bar.Size = UDim2.new(0, 4, 1, -10)
@@ -256,7 +240,6 @@ local function makeCard(parent)
     bar.BorderSizePixel = 0
     Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 3)
 
-    -- Icon circle
     local iconCircle = Instance.new("Frame", card)
     iconCircle.Name = "IconCircle"
     iconCircle.Size = UDim2.fromOffset(32, 32)
@@ -277,7 +260,6 @@ local function makeCard(parent)
     icon.Font = Enum.Font.GothamBold
     icon.TextColor3 = Color3.fromRGB(255, 255, 255)
 
-    -- Nama brainrot
     local nameLbl = Instance.new("TextLabel", card)
     nameLbl.Name = "NameLbl"
     nameLbl.Size = UDim2.new(1, -130, 0, 18)
@@ -290,7 +272,6 @@ local function makeCard(parent)
     nameLbl.TextXAlignment = Enum.TextXAlignment.Left
     nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
 
-    -- Row bawah: variant badge + dist + priority
     local rowFrame = Instance.new("Frame", card)
     rowFrame.Name = "RowFrame"
     rowFrame.Size = UDim2.new(1, -58, 0, 18)
@@ -301,7 +282,6 @@ local function makeCard(parent)
     rowList.Padding = UDim.new(0, 5)
     rowList.VerticalAlignment = Enum.VerticalAlignment.Center
 
-    -- Variant badge
     local varLbl = Instance.new("TextLabel", rowFrame)
     varLbl.Name = "Variant"
     varLbl.Size = UDim2.fromOffset(50, 16)
@@ -313,7 +293,6 @@ local function makeCard(parent)
     varLbl.Font = Enum.Font.GothamBold
     Instance.new("UICorner", varLbl).CornerRadius = UDim.new(0, 5)
 
-    -- Jarak badge
     local distLbl = Instance.new("TextLabel", rowFrame)
     distLbl.Name = "Dist"
     distLbl.Size = UDim2.fromOffset(40, 16)
@@ -325,7 +304,6 @@ local function makeCard(parent)
     distLbl.Font = Enum.Font.GothamBold
     Instance.new("UICorner", distLbl).CornerRadius = UDim.new(0, 5)
 
-    -- Status indicator (kanan card) — "TARGET" kalau di-tween, "AUTO" kalau top priority biasa
     local statusBadge = Instance.new("TextLabel", card)
     statusBadge.Name = "StatusBadge"
     statusBadge.Size = UDim2.fromOffset(54, 38)
@@ -345,7 +323,6 @@ local function makeCard(parent)
     return card
 end
 
--- Pool card
 local cardPool = {}
 local function getCard()
     local c = table.remove(cardPool)
@@ -362,7 +339,6 @@ end
 
 local activeCards = {}
 
--- ── UPDATE RADAR ──────────────────────────────────────────────────
 local function updateRadar()
     local char = LP.Character
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
@@ -434,7 +410,6 @@ local function updateRadar()
         return
     end
 
-    -- Status bar text
     if currentTweenPrompt then
         statusLbl.Text = '<font color="#FF6060">🎯 Menuju target...</font>'
     else
@@ -452,34 +427,20 @@ local function updateRadar()
         local card = getCard()
         table.insert(activeCards, card)
 
-        -- Color bar
         card.ColorBar.BackgroundColor3 = col
 
-        -- Card styling
         local cs = card:FindFirstChildOfClass("UIStroke")
         if isTweening then
-            -- Merah berkedip — target aktif sedang di-tween
             card.BackgroundColor3 = Color3.fromRGB(28, 8, 8)
-            if cs then
-                cs.Color = Color3.fromRGB(220, 50, 50)
-                cs.Thickness = 1.5
-            end
+            if cs then cs.Color = Color3.fromRGB(220, 50, 50); cs.Thickness = 1.5 end
         elseif isTop then
-            -- Hijau soft — next auto target
             card.BackgroundColor3 = Color3.fromRGB(8, 22, 14)
-            if cs then
-                cs.Color = Color3.fromRGB(40, 160, 80)
-                cs.Thickness = 1.2
-            end
+            if cs then cs.Color = Color3.fromRGB(40, 160, 80); cs.Thickness = 1.2 end
         else
             card.BackgroundColor3 = Color3.fromRGB(14, 14, 26)
-            if cs then
-                cs.Color = Color3.fromRGB(35, 38, 65)
-                cs.Thickness = 1
-            end
+            if cs then cs.Color = Color3.fromRGB(35, 38, 65); cs.Thickness = 1 end
         end
 
-        -- Icon circle
         local iconCircle = card:FindFirstChild("IconCircle")
         if iconCircle then
             iconCircle.BackgroundColor3 = Color3.fromRGB(
@@ -490,19 +451,14 @@ local function updateRadar()
             local icStroke = iconCircle:FindFirstChildOfClass("UIStroke")
             if icStroke then icStroke.Color = col end
             local iconLbl = iconCircle:FindFirstChild("Icon")
-            if iconLbl then
-                iconLbl.Text = icon
-                iconLbl.TextColor3 = col
-            end
+            if iconLbl then iconLbl.Text = icon; iconLbl.TextColor3 = col end
         end
 
-        -- Nama
         card.NameLbl.Text = item.name
         card.NameLbl.TextColor3 = isTweening
             and Color3.fromRGB(255, 180, 180)
             or  (isTop and Color3.fromRGB(200, 255, 220) or Color3.fromRGB(220, 225, 255))
 
-        -- Variant badge
         local rowFrame = card:FindFirstChild("RowFrame")
         if rowFrame then
             local varLbl = rowFrame:FindFirstChild("Variant")
@@ -527,7 +483,6 @@ local function updateRadar()
             end
         end
 
-        -- Status badge kanan
         local sb = card:FindFirstChild("StatusBadge")
         if sb then
             local sbStroke = sb:FindFirstChildOfClass("UIStroke")
@@ -542,7 +497,6 @@ local function updateRadar()
                 sb.BackgroundColor3 = Color3.fromRGB(8, 28, 16)
                 if sbStroke then sbStroke.Color = Color3.fromRGB(40, 160, 80) end
             else
-                -- Tampilkan rank priority
                 local rank = item.priority
                 local rankStr = rank > 0 and ("P" .. rank) or "—"
                 sb.Text = rankStr
@@ -554,13 +508,11 @@ local function updateRadar()
     end
 end
 
--- ── MINIMIZE / MAXIMIZE LOGIC ─────────────────────────────────────
 local isMinimized = false
 
 local function setMinimized(v)
     isMinimized = v
     if v then
-        -- Minimize: kecilkan frame jadi cuma topbar
         TweenService:Create(mainFrame,
             TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
             { Size = UDim2.fromOffset(RADAR_W, 40) }
@@ -571,7 +523,6 @@ local function setMinimized(v)
         minimizeBtn.TextColor3 = Color3.fromRGB(80, 200, 130)
         minStroke.Color = Color3.fromRGB(40, 130, 80)
     else
-        -- Maximize: balik ke ukuran penuh
         TweenService:Create(mainFrame,
             TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
             { Size = UDim2.fromOffset(RADAR_W, RADAR_H) }
@@ -588,20 +539,12 @@ minimizeBtn.MouseButton1Click:Connect(function()
     setMinimized(not isMinimized)
 end)
 
--- Loop update tiap 0.2 detik (lebih responsif)
 task.spawn(function()
     while true do
         pcall(updateRadar)
         task.wait(0.2)
     end
 end)
-
-
-
-
-
-
-
 
 local isMobile = table.find({Enum.Platform.Android, Enum.Platform.IOS}, UserInputService:GetPlatform())
 local windowSize = isMobile and UDim2.fromOffset(528, 334) or UDim2.fromOffset(580, 350)
@@ -620,7 +563,12 @@ local TabMain   = Window:Tab({ ["Title"] = "Main",     ["Icon"] = "house" })
 local TabMainV2 = Window:Tab({ ["Title"] = "Main V2",  ["Icon"] = "zap" })
 local TabTP     = Window:Tab({ ["Title"] = "Teleport", ["Icon"] = "map-pin" })
 
+-- =============================================
+--  NEST LIST (+ Lord Veyrath baru)
+-- =============================================
 local nests = {
+    -- ✅ TOP PRIORITY NEST
+    {"Lord Veyrath",       "lordVeyrath"},
     {"Meowl",              "meowl"},
     {"Eleccobee",          "eleccoBee"},
     {"Lava Golem",         "lavaGolem"},
@@ -639,7 +587,9 @@ local resetPos   = Vector3.new(-34.5, 33.5, -297.1)
 local BASE_POS   = Vector3.new(-34.5, 33.5, -297.1)
 local SCAN_RADIUS = 75
 
--- Bounding box tiap nest (X dan Z) untuk validasi posisi
+-- =============================================
+--  NEST BOUNDS (+ Lord Veyrath)
+-- =============================================
 local NEST_BOUNDS = {
     meowl            = { xMin=773.6, xMax=896.6, zMin=-354.5,  zMax=-248.4  },
     eleccoBee        = { xMin=530.7, xMax=636.5, zMin=-1029.1, zMax=-906.0  },
@@ -653,9 +603,10 @@ local NEST_BOUNDS = {
     esokSekolah      = { xMin=68.6,  xMax=174.6, zMin=-1026.3, zMax=-903.1  },
     brainrot67       = { xMin=-55.0, xMax=51.1,  zMin=191.6,   zMax=314.7   },
     noob             = { xMin=-27.4, xMax=78.9,  zMin=-1028.9, zMax=-905.7  },
+    -- ✅ NEW NEST BOUNDS (estimasi — sesuaikan jika perlu)
+    lordVeyrath      = { xMin=900.0, xMax=1050.0, zMin=-400.0, zMax=-250.0  },
 }
 
--- Cek apakah HRP ada di dalam bounding box nest tertentu
 local function isInNest(nestId)
     if not HRP then return false end
     local b = NEST_BOUNDS[nestId]
@@ -665,10 +616,6 @@ local function isInNest(nestId)
        and p.Z >= b.zMin and p.Z <= b.zMax
 end
 
--- =============================================
---  HELPER: cek nest sudah di-unlock:
---  FireServer enterNest → tunggu posisi HRP berubah > 50 unit
--- =============================================
 local function isNestUnlocked(nestId)
     if not HRP then return false end
     local startPos = HRP.Position
@@ -686,20 +633,26 @@ local function isNestUnlocked(nestId)
     return false
 end
 
--- V2: nest yang dipilih manual oleh user (default = nest pertama)
 local selectedNestId   = nests[1][2]
 local selectedNestName = nests[1][1]
 
--- Lookup reward langsung by "name|variant" → reward (518 entries)
+-- =============================================
+--  BRAINROT SCORE TABLE
+-- =============================================
 local BRAINROT_SCORE = {}
 do
     local list = {
-        {"rengRongo","poison",500000000000},{"rengRongo","diamond",425000000000},{"rengRongo","astral",200000000000},{"rengRongo","honey",175000000000},{"rengRongo","blazing",160000000000},{"rengRongo","gold",150000000000},{"rengRongo","normal",100000000000},
-        {"kingFalken","astral",375000000000},{"kingFalken","gold",375000000000},{"kingFalken","honey",325000000000},{"kingFalken","diamond",318750000000},{"kingFalken","blazing",300000000000},{"kingFalken","poison",250000000000},{"kingFalken","normal",250000000000},
-        {"vulture","blazing",360000000000},{"vulture","astral",300000000000},{"vulture","poison",300000000000},{"vulture","honey",270000000000},{"vulture","diamond",255000000000},{"vulture","gold",90000000000},{"vulture","normal",60000000000},
+        -- ✅ PARADOX TIER (nilai resmi dari game)
+        {"lordoRobo","astral",1040000000000},{"lordoRobo","honey",910000000000},{"lordoRobo","blazing",780000000000},{"lordoRobo","poison",650000000000},{"lordoRobo","diamond",552500000000},{"lordoRobo","gold",195000000000},{"lordoRobo","normal",130000000000},
+        {"rengRongo","astral",800000000000},{"rengRongo","honey",700000000000},{"rengRongo","blazing",600000000000},{"rengRongo","poison",500000000000},{"rengRongo","diamond",425000000000},{"rengRongo","gold",150000000000},{"rengRongo","normal",100000000000},
+        {"lordVeyrath","astral",560000000000},{"lordVeyrath","honey",490000000000},{"lordVeyrath","blazing",420000000000},{"lordVeyrath","poison",350000000000},{"lordVeyrath","diamond",297500000000},{"lordVeyrath","gold",105000000000},{"lordVeyrath","normal",70000000000},
+        {"microbelloPizzini","astral",520000000000},{"microbelloPizzini","honey",455000000000},{"microbelloPizzini","blazing",390000000000},{"microbelloPizzini","poison",325000000000},{"microbelloPizzini","diamond",276250000000},{"microbelloPizzini","gold",97500000000},{"microbelloPizzini","normal",65000000000},
+        {"piectopus","astral",320000000000},{"piectopus","honey",280000000000},{"piectopus","blazing",240000000000},{"piectopus","poison",200000000000},{"piectopus","diamond",170000000000},{"piectopus","gold",60000000000},{"piectopus","normal",40000000000},
+        {"kingFalken","astral",200000000000},{"kingFalken","honey",175000000000},{"kingFalken","blazing",150000000000},{"kingFalken","poison",125000000000},{"kingFalken","diamond",106250000000},{"kingFalken","gold",37500000000},{"kingFalken","normal",25000000000},
+        -- ✅ ETERNAL TIER (nilai resmi dari game)
+        {"vulture","astral",480000000000},{"vulture","honey",420000000000},{"vulture","blazing",360000000000},{"vulture","poison",300000000000},{"vulture","diamond",255000000000},{"vulture","gold",90000000000},{"vulture","normal",60000000000},
         {"pineaplino","astral",320000000000},{"pineaplino","honey",280000000000},{"pineaplino","blazing",240000000000},{"pineaplino","poison",200000000000},{"pineaplino","diamond",170000000000},{"pineaplino","gold",60000000000},{"pineaplino","normal",40000000000},
         {"neonMeowl","astral",280000000000},{"neonMeowl","honey",245000000000},{"neonMeowl","blazing",210000000000},{"neonMeowl","poison",175000000000},{"neonMeowl","diamond",148750000000},{"neonMeowl","gold",52500000000},{"neonMeowl","normal",35000000000},
-        {"lordoRobo","astral",260000000000},{"lordoRobo","honey",227500000000},{"lordoRobo","blazing",195000000000},{"lordoRobo","poison",195000000000},{"lordoRobo","gold",195000000000},{"lordoRobo","diamond",175750000000},{"lordoRobo","normal",130000000000},
         {"jobJobDiablo","astral",240000000000},{"jobJobDiablo","honey",210000000000},{"jobJobDiablo","blazing",180000000000},{"jobJobDiablo","poison",150000000000},{"jobJobDiablo","diamond",127500000000},{"jobJobDiablo","gold",45000000000},{"jobJobDiablo","normal",30000000000},
         {"crocoBling","astral",176000000000},{"crocoBling","honey",154000000000},{"crocoBling","blazing",132000000000},{"crocoBling","poison",110000000000},{"crocoBling","diamond",93500000000},{"crocoBling","gold",33000000000},{"crocoBling","normal",22000000000},
         {"eleccoBee","astral",160000000000},{"eleccoBee","honey",140000000000},{"eleccoBee","blazing",120000000000},{"eleccoBee","poison",100000000000},{"eleccoBee","diamond",85000000000},{"eleccoBee","gold",30000000000},{"eleccoBee","normal",20000000000},
@@ -768,23 +721,18 @@ do
         {"porkupine","astral",80},{"porkupine","honey",70},{"porkupine","blazing",60},{"porkupine","poison",50},{"porkupine","diamond",43},{"porkupine","gold",15},{"porkupine","normal",10},
         {"pipiKiwi","astral",48},{"pipiKiwi","honey",42},{"pipiKiwi","blazing",36},{"pipiKiwi","poison",30},{"pipiKiwi","diamond",26},{"pipiKiwi","gold",9},{"pipiKiwi","normal",6},
         {"talpaDiFerro","astral",16},{"talpaDiFerro","honey",14},{"talpaDiFerro","blazing",12},{"talpaDiFerro","poison",10},{"talpaDiFerro","diamond",9},{"talpaDiFerro","gold",3},{"talpaDiFerro","normal",2},
+        -- ✅ NEW: tokTakTek (Singularity) — dari foto
+        {"tokTakTek","astral",80000000000},{"tokTakTek","honey",70000000000},{"tokTakTek","blazing",60000000000},{"tokTakTek","poison",50000000000},{"tokTakTek","diamond",42500000000},{"tokTakTek","gold",15000000000},{"tokTakTek","normal",10000000000},
+        -- ✅ NEW: rosano (Infinity) — dari foto
+        {"rosano","astral",10400000000},{"rosano","honey",9100000000},{"rosano","blazing",7800000000},{"rosano","poison",6500000000},{"rosano","diamond",5525000000},{"rosano","gold",1950000000},{"rosano","normal",1300000000},
     }
     for _, v in ipairs(list) do
         BRAINROT_SCORE[v[1] .. "|" .. v[2]] = v[3]
     end
 end
 
-
-
-
-
--- =============================================
---  HELPER: ambil model & posisi dari prompt
--- =============================================
 local function getModelFromPrompt(prompt)
     if not prompt then return nil, nil end
-    -- Struktur: Model > ProximityAttachment (Attachment) > ProximityPrompt
-    -- prompt.Parent = ProximityAttachment, prompt.Parent.Parent = Model
     local model = nil
     local ok, err = pcall(function()
         local attachment = prompt.Parent
@@ -794,7 +742,6 @@ local function getModelFromPrompt(prompt)
                 if parent:IsA("Model") then
                     model = parent
                 elseif parent:IsA("BasePart") then
-                    -- BasePart langsung, ambil parent-nya jika Model
                     if parent.Parent and parent.Parent:IsA("Model") then
                         model = parent.Parent
                     else
@@ -818,18 +765,11 @@ local function getModelFromPrompt(prompt)
     return model, pos
 end
 
--- =============================================
---  HELPER: cek apakah sedang di base
--- =============================================
 local function isAtBase()
     if not HRP then return true end
     return (HRP.Position - BASE_POS).Magnitude < 150
 end
 
--- =============================================
---  HELPER: tunggu karakter tiba di base setelah tweenToBase()
---  FIX: paksa refresh HRP dan CFrame, tidak bergantung polling isAtBase
--- =============================================
 local function waitArrivedAtBase()
     task.wait(0.2)
     local char = LP.Character
@@ -842,7 +782,6 @@ local function waitArrivedAtBase()
         HRP.CFrame = CFrame.new(BASE_POS)
     end
     task.wait(0.3)
-    -- Refresh sekali lagi untuk pastikan HRP global up-to-date
     char = LP.Character
     hrp  = char and char:FindFirstChild("HumanoidRootPart")
     if char then Character = char end
@@ -850,13 +789,7 @@ local function waitArrivedAtBase()
     return true
 end
 
--- =============================================
---  HELPER: tunggu karakter respawn di base setelah kill (tpAndReset)
---  1) Tunggu dulu karakter lama mati (max 1.5s)
---  2) Tunggu karakter baru spawn + hidup + ada di Base (max 8s)
--- =============================================
 local function waitRespawnAtBase()
-    -- Setelah tpAndReset: refresh HRP & paksa CFrame ke BASE_POS
     task.wait(0.2)
     local char = LP.Character
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
@@ -869,9 +802,6 @@ local function waitRespawnAtBase()
     return true
 end
 
--- =============================================
---  HELPER: tunggu posisi berubah signifikan
--- =============================================
 local function waitForPositionChange(timeout)
     local startPos = HRP.Position
     local elapsed  = 0
@@ -883,9 +813,6 @@ local function waitForPositionChange(timeout)
     return false
 end
 
--- =============================================
---  HELPER: cari nest yang aktif
--- =============================================
 local function findActiveNest()
     for _, nest in ipairs(nests) do
         if not isAtBase() then
@@ -905,27 +832,17 @@ local function findActiveNest()
     return nil
 end
 
--- =============================================
---  HELPER: TP ke base lalu kill character
---  ✅ FIX: selalu ambil Character & HRP fresh dari LP.Character
---          supaya tidak stale setelah tweenToBase / leave nest
--- =============================================
 local function tpAndReset()
-    -- Refresh karakter dulu
     local char = LP.Character
     local hrp  = char and char:FindFirstChild("HumanoidRootPart")
     if char then Character = char end
     if hrp  then HRP = hrp end
-    -- TP langsung via CFrame (sama seperti v3 yang bekerja)
     if hrp and hrp.Parent then
         hrp.CFrame = CFrame.new(resetPos)
     end
     task.wait(0.5)
 end
 
--- =============================================
---  HELPER: fire leaveNest (keluar dari nest via remote)
--- =============================================
 local function fireLeaveNest()
     pcall(function()
         remContainer["game.nest.leaveNest"]:FireServer()
@@ -933,9 +850,6 @@ local function fireLeaveNest()
     task.wait(0.3)
 end
 
--- =============================================
---  HELPER: Hold Coil (auto call saat tween dimulai) ✅ FIXED
--- =============================================
 local function holdCoil()
     local args = {
         "7100d5d7-7dde-4aea-af45-b036ad34bf00"
@@ -945,13 +859,7 @@ local function holdCoil()
     end)
 end
 
--- =============================================
---  HELPER: tween balik ke base (untuk klaim setelah drop button)
---  FIX: pakai timeout pada Completed:Wait() supaya tidak hang
---       jika karakter di-reset server setelah grab brainrot
--- =============================================
 local function tweenToBase()
-    -- Tunggu HRP valid (max 3 detik)
     local char, hrp
     local elapsed = 0
     repeat
@@ -970,15 +878,12 @@ local function tweenToBase()
     Character = char
     HRP       = hrp
 
-    -- Auto Hold Coil
     holdCoil()
     task.wait(0.05)
 
-    -- Refresh lagi setelah holdCoil (karakter bisa respawn/berubah)
     char = LP.Character
     hrp  = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp or not hrp.Parent then
-        -- Langsung CFrame fallback
         if HRP and HRP.Parent then HRP.CFrame = CFrame.new(BASE_POS) end
         task.wait(0.3)
         return
@@ -991,8 +896,6 @@ local function tweenToBase()
     local distance = (hrp.Position - targetCF.Position).Magnitude
     local duration = math.max(distance / speed, 0.1)
 
-    -- Tween dengan timeout: jika tween selesai dalam waktunya bagus,
-    -- kalau tidak (karakter respawn dll), paksa CFrame langsung
     local tweenDone = false
     local positionTween = TweenService:Create(
         hrp,
@@ -1001,7 +904,6 @@ local function tweenToBase()
     )
     positionTween:Play()
 
-    -- Tunggu selesai DENGAN timeout (duration + 2 detik buffer)
     local maxWait  = duration + 2
     local waited   = 0
     local conn
@@ -1015,7 +917,6 @@ local function tweenToBase()
     pcall(function() conn:Disconnect() end)
     pcall(function() positionTween:Cancel() end)
 
-    -- Paksa CFrame sekali lagi setelah tween (fallback anti server push-back)
     task.wait(0.1)
     char = LP.Character
     hrp  = char and char:FindFirstChild("HumanoidRootPart")
@@ -1029,9 +930,6 @@ local function tweenToBase()
     task.wait(0.2)
 end
 
--- =============================================
---  HELPER: tunggu DropButton visible
--- =============================================
 local function waitDropButton(timeout)
     local inGameGui = LP.PlayerGui:FindFirstChild("InGameGui")
     if not inGameGui then return false end
@@ -1046,10 +944,6 @@ local function waitDropButton(timeout)
     return false
 end
 
--- =============================================
---  HELPER: ambil score langsung dari lookup table
---  key = "brainrotName|variant"
--- =============================================
 local function getBrainrotScore(model)
     if not model then return 0, "Normal" end
     local brainrotName, variant = "", "normal"
@@ -1062,13 +956,10 @@ local function getBrainrotScore(model)
     return score, label
 end
 
--- =============================================
---  HELPER: tween ke prompt lalu fire
--- =============================================
-local activeTween = nil  -- tween yang sedang berjalan (bisa di-cancel)
+local activeTween = nil
 
--- grabProximityPrompt: tween ke brainrot, cancel jika prompt despawn atau keluar bounds
--- nestBounds (opsional): kalau diisi, cancel jika brainrot keluar bounds nest
+local VARIANT_PRIORITY_FALLBACK = {astral=6,honey=5,blazing=4,poison=3,diamond=2,gold=1,normal=0}
+
 local function grabProximityPrompt(prompt, nestBounds)
     if not prompt or not HRP then return false end
 
@@ -1087,7 +978,6 @@ local function grabProximityPrompt(prompt, nestBounds)
     end
     if not pos then return false end
 
-    -- Cek bounds sebelum mulai tween
     if nestBounds then
         if pos.X < nestBounds.xMin or pos.X > nestBounds.xMax
         or pos.Z < nestBounds.zMin or pos.Z > nestBounds.zMax then
@@ -1101,17 +991,14 @@ local function grabProximityPrompt(prompt, nestBounds)
     local tweenInfo    = TweenInfo.new(4.5, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
     activeTween        = TweenService:Create(HRP, tweenInfo, { CFrame = targetCFrame })
 
-    -- Flag untuk monitor thread
     local cancelled = false
     local tweenDone = false
 
-    -- Monitor di thread terpisah: cek despawn & bounds tiap 0.3 detik
     local monitorThread = task.spawn(function()
         while not tweenDone do
             task.wait(0.3)
             if tweenDone then break end
 
-            -- Cek prompt masih ada (model masih di workspace)
             local model = nil
             pcall(function()
                 local att = prompt.Parent
@@ -1124,7 +1011,6 @@ local function grabProximityPrompt(prompt, nestBounds)
                 break
             end
 
-            -- Cek brainrot masih di dalam bounds
             if nestBounds and not cancelled then
                 local curPos = nil
                 pcall(function()
@@ -1145,13 +1031,11 @@ local function grabProximityPrompt(prompt, nestBounds)
 
     activeTween:Play()
 
-    -- FIX: pakai timeout pada Completed:Wait() supaya tidak hang
-    -- jika tween di-cancel oleh monitorThread (cancelled=true) tapi event tidak fire
     local tweenConn
     tweenConn = activeTween.Completed:Connect(function()
         tweenDone = true
     end)
-    local tweenMaxWait = 4.5 + 2  -- duration tween + buffer
+    local tweenMaxWait = 4.5 + 2
     local tweenWaited  = 0
     while not tweenDone and not cancelled and tweenWaited < tweenMaxWait do
         task.wait(0.1)
@@ -1175,19 +1059,12 @@ local function grabProximityPrompt(prompt, nestBounds)
     return true
 end
 
--- =============================================
---  HELPER: scan radius 75, pilih score tertinggi
---  score = reward × variant multiplier
--- =============================================
--- blacklistedPositions = posisi brainrot Robux, TIDAK pernah direset (persist sesi)
--- nestId (opsional): kalau diisi, hanya ambil brainrot di dalam NEST_BOUNDS[nestId]
-local VARIANT_PRIORITY_FALLBACK = {astral=6,honey=5,blazing=4,poison=3,diamond=2,gold=1,normal=0}
+local blacklistedPositions = {}
 
 local function findBest(blacklistedPositions, nestId)
     if not HRP then return nil, 0, "Normal" end
     blacklistedPositions = blacklistedPositions or {}
 
-    -- Ambil bounding box nest yang aktif (nil = tidak filter bounds)
     local bounds = nestId and NEST_BOUNDS[nestId] or nil
 
     local best, bestScore, bestVariantPri, bestLabel = nil, -1, -1, "Normal"
@@ -1199,7 +1076,6 @@ local function findBest(blacklistedPositions, nestId)
             if action == "grab" then
                 local model, pos = getModelFromPrompt(obj)
                 if model and pos then
-                    -- Filter: brainrot harus di dalam bounding box nest yang dituju
                     if bounds then
                         if pos.X < bounds.xMin or pos.X > bounds.xMax
                         or pos.Z < bounds.zMin or pos.Z > bounds.zMax then
@@ -1218,15 +1094,12 @@ local function findBest(blacklistedPositions, nestId)
                         local dist = (pos - HRP.Position).Magnitude
                         if dist <= SCAN_RADIUS then
                             local score, label = getBrainrotScore(model)
-                            -- Ambil variant priority untuk tiebreak kalau score = 0
                             local variant = "normal"
                             pcall(function()
                                 variant = (model:GetAttribute("variant") or "normal"):lower()
                             end)
                             local varPri = VARIANT_PRIORITY_FALLBACK[variant] or 0
 
-                            -- Bandingkan: utamakan score lookup table,
-                            -- kalau sama (misal sama-sama 0), fallback ke variant priority
                             local better = false
                             if score > bestScore then
                                 better = true
@@ -1250,25 +1123,24 @@ local function findBest(blacklistedPositions, nestId)
     return best, bestScore, bestLabel
 end
 
--- Blacklist posisi Robux — persist sepanjang sesi, shared semua fitur
-local blacklistedPositions = {}
-
 -- =============================================
---  AUTO BRAINROT V3 — DATA & HELPERS
+--  AUTO BRAINROT V3 DATA & HELPERS
 -- =============================================
-
--- Urutan rarity (index = tingkat, makin besar makin tinggi)
 local RARITY_ORDER = {
     Common=1, Uncommon=2, Rare=3, Epic=4, Legendary=5,
     Mythical=6, Cosmic=7, Secret=8, Celestial=9,
-    Divine=10, Infinity=11, Singularity=12, Eternal=13,
+    Divine=10, Infinity=11, Singularity=12, Eternal=13, Paradox=14,
 }
 
--- List brainrot lengkap dari brainrotList_lua.txt
 local BRAINROT_LIST = {
-    {rarity="Eternal",     name="kingFalken"},
-    {rarity="Eternal",     name="lordoRobo"},
-    {rarity="Eternal",     name="rengRongo"},
+    -- ✅ PARADOX (paling atas)
+    {rarity="Paradox",     name="lordoRobo"},
+    {rarity="Paradox",     name="rengRongo"},
+    {rarity="Paradox",     name="lordVeyrath"},
+    {rarity="Paradox",     name="microbelloPizzini"},
+    {rarity="Paradox",     name="piectopus"},
+    {rarity="Paradox",     name="kingFalken"},
+    -- ETERNAL
     {rarity="Eternal",     name="vulture"},
     {rarity="Eternal",     name="pineaplino"},
     {rarity="Eternal",     name="neonMeowl"},
@@ -1280,10 +1152,14 @@ local BRAINROT_LIST = {
     {rarity="Singularity", name="fireDragon"},
     {rarity="Singularity", name="fireMedusa"},
     {rarity="Singularity", name="fireCappuccino"},
+    {rarity="Singularity", name="singularoAssassino"},
+    {rarity="Singularity", name="reptistono"},
+    {rarity="Singularity", name="tokTakTek"},
     {rarity="Infinity",    name="sadoBananito"},
     {rarity="Infinity",    name="grappeminoDojo"},
     {rarity="Infinity",    name="techDimon"},
     {rarity="Infinity",    name="techScorpio"},
+    {rarity="Infinity",    name="rosano"},
     {rarity="Divine",      name="sadoSkeletono"},
     {rarity="Divine",      name="grappellinoDoro"},
     {rarity="Divine",      name="strawberryElephant"},
@@ -1292,11 +1168,11 @@ local BRAINROT_LIST = {
     {rarity="Divine",      name="stoupoTraffico"},
     {rarity="Divine",      name="cupitronUFO"},
     {rarity="Divine",      name="galactioFantasma"},
+    {rarity="Celestial",   name="frogzoSoda"},
     {rarity="Celestial",   name="udinDinDun"},
     {rarity="Celestial",   name="rubickPlanet"},
     {rarity="Celestial",   name="potatoRider"},
     {rarity="Celestial",   name="dugdug"},
-    {rarity="Celestial",   name="frogzoSoda"},
     {rarity="Celestial",   name="wOrL"},
     {rarity="Celestial",   name="glacierelloInfernitti"},
     {rarity="Celestial",   name="crostinaGelifio"},
@@ -1342,13 +1218,14 @@ local BRAINROT_LIST = {
     {rarity="Common",      name="talpaDiFerro"},
 }
 
--- Lookup cepat name → rarity
 local BRAINROT_RARITY_MAP = {}
 for _, b in ipairs(BRAINROT_LIST) do
     BRAINROT_RARITY_MAP[b.name:lower()] = b.rarity
 end
 
--- Map nest → rarity yang tersedia di nest itu
+-- =============================================
+--  NEST RARITY MAP (+ Lord Veyrath nest)
+-- =============================================
 local NEST_RARITY = {
     noob             = {"Common","Uncommon"},
     brainrot67       = {"Uncommon","Rare","Epic"},
@@ -1362,31 +1239,30 @@ local NEST_RARITY = {
     lavaGolem        = {"Infinity","Singularity"},
     eleccoBee        = {"Singularity","Eternal"},
     meowl            = {"Eternal"},
+    -- ✅ NEW
+    lordVeyrath      = {"Eternal","Paradox"},
 }
 
--- Nest berurutan dari terendah ke tertinggi (untuk routing)
 local NEST_ORDER = {
     "noob","brainrot67","esokSekolah","karkarKurkurkur",
     "yellowLuckyBlock","strewberry","jobJobJobSahur",
     "dragonCannelloni","frogioBlingo","lavaGolem","eleccoBee","meowl",
+    -- ✅ NEW
+    "lordVeyrath",
 }
 
--- Cari nest TERENDAH yang menyediakan rarity tertentu
 local function findMinNestForRarity(rarityName)
     for _, nestId in ipairs(NEST_ORDER) do
         local rarities = NEST_RARITY[nestId]
         if rarities then
             for _, r in ipairs(rarities) do
-                if r == rarityName then
-                    return nestId
-                end
+                if r == rarityName then return nestId end
             end
         end
     end
     return nil
 end
 
--- Cek apakah nest menyediakan rarity tertentu
 local function nestHasRarity(nestId, rarityName)
     local rarities = NEST_RARITY[nestId]
     if not rarities then return false end
@@ -1396,33 +1272,26 @@ local function nestHasRarity(nestId, rarityName)
     return false
 end
 
--- State V3 (multi-select)
-local v3TargetBrainrots = {}   -- SET nama brainrot yang dipilih (internal name lowercase) → true
-local v3TargetVariants  = {}   -- SET variant/mutasi target → true (kosong = any semua)
-local v3TargetRarities  = {}   -- SET rarity dari semua brainrot yang dipilih
-local v3TargetBrainrot  = ""   -- (compat) nama pertama, untuk notify
-local v3TargetVariant   = ""   -- (compat) variant pertama, untuk notify
-local v3TargetRarity    = ""   -- (compat) rarity pertama
-local v3BlacklistPos    = {}   -- blacklist posisi khusus V3 (reset per-run)
-local v3FailCount       = {}   -- hitungan fail per posisi
+local v3TargetBrainrots = {}
+local v3TargetVariants  = {}
+local v3TargetRarities  = {}
+local v3TargetBrainrot  = ""
+local v3TargetVariant   = ""
+local v3TargetRarity    = ""
+local v3BlacklistPos    = {}
+local v3FailCount       = {}
 
--- Helper: apakah brainrotName cocok dengan target yang dipilih?
 local function v3MatchBrainrot(bName)
-    -- Jika tidak ada yang dipilih, match semua (fallback)
     if next(v3TargetBrainrots) == nil then return true end
     return v3TargetBrainrots[bName:gsub("%s+","")] == true
 end
 
--- Helper: apakah variant cocok dengan target yang dipilih?
 local function v3MatchVariant(bVariant)
-    -- Jika kosong (any all) atau "any" ada di set → match semua
     if next(v3TargetVariants) == nil or v3TargetVariants["any"] then return true end
     return v3TargetVariants[bVariant] == true
 end
 
--- Helper: dapatkan rarity tertinggi dari semua brainrot yang dipilih (untuk cari validNests)
 local function v3GetLowestRarity()
-    -- Cari rarity dengan RARITY_ORDER terendah supaya nestnya bisa cover semua target
     local minRank = 99
     local minRarity = ""
     for _, b in ipairs(BRAINROT_LIST) do
@@ -1436,7 +1305,6 @@ local function v3GetLowestRarity()
         end
     end
     if minRarity == "" then
-        -- Fallback ke rarity pertama di list
         for _, b in ipairs(BRAINROT_LIST) do
             minRarity = b.rarity; break
         end
@@ -1444,7 +1312,6 @@ local function v3GetLowestRarity()
     return minRarity
 end
 
--- findBest khusus V3: hanya ambil brainrot yang namanya cocok (+ variant kalau diset)
 local function findBestV3(nestId)
     if not HRP then return nil, nil end
     local bounds = nestId and NEST_BOUNDS[nestId] or nil
@@ -1459,7 +1326,6 @@ local function findBestV3(nestId)
             if action == "grab" then
                 local model, pos = getModelFromPrompt(obj)
                 if model and pos then
-                    -- Filter bounds
                     if bounds then
                         if pos.X < bounds.xMin or pos.X > bounds.xMax
                         or pos.Z < bounds.zMin or pos.Z > bounds.zMax then
@@ -1467,11 +1333,9 @@ local function findBestV3(nestId)
                         end
                     end
 
-                    -- Filter radius: max 500 unit dari player (seluruh area nest)
                     local dist = (pos - HRP.Position).Magnitude
                     if dist > 500 then continue end
 
-                    -- Cek blacklist V3
                     local isBlacklisted = false
                     for _, bpos in ipairs(v3BlacklistPos) do
                         if (pos - bpos).Magnitude < 5 then
@@ -1481,20 +1345,15 @@ local function findBestV3(nestId)
                     end
                     if isBlacklisted then continue end
 
-                    -- Ambil nama & variant dari model
                     local bName, bVariant = "", "normal"
                     pcall(function()
                         local n = model:GetAttribute("name")
                         local rawName = n and tostring(n) or model.Name
-                        -- Normalisasi: lowercase + hapus spasi agar "w or l" == "worl"
                         bName    = rawName:lower():gsub("%s+", "")
                         bVariant = (model:GetAttribute("variant") or "normal"):lower()
                     end)
 
-                    -- Cocokkan nama brainrot (multi-select)
                     if not v3MatchBrainrot(bName) then continue end
-
-                    -- Cocokkan variant (multi-select, "any" = semua)
                     if not v3MatchVariant(bVariant) then continue end
 
                     local varPri = VARIANT_PRIORITY_FALLBACK[bVariant] or 0
@@ -1511,21 +1370,21 @@ local function findBestV3(nestId)
     return best, bestPos
 end
 
--- Buat dropdown list brainrot (nama display) dan map ke internal name
 local v3BrainrotDisplayList = {}
-local v3BrainrotDisplayMap  = {}  -- displayName → {name, rarity}
+local v3BrainrotDisplayMap  = {}
 for _, b in ipairs(BRAINROT_LIST) do
-    -- Format: "pipiKiwi (Common)"
     local display = b.name .. " (" .. b.rarity .. ")"
-    table.insert(v3BrainrotDisplayList, display)
-    v3BrainrotDisplayMap[display] = {name=b.name, rarity=b.rarity}
+    -- Hindari duplikat di display list
+    if not v3BrainrotDisplayMap[display] then
+        table.insert(v3BrainrotDisplayList, display)
+        v3BrainrotDisplayMap[display] = {name=b.name, rarity=b.rarity}
+    end
 end
 
 local VARIANT_LIST = {"any","normal","gold","diamond","blazing","poison","honey","astral"}
 
--- V3 multi-select state (display)
-local v3SelectedDisplays = {}   -- set displayName → true
-local v3SelectedVariantSet = {["any"]=true}  -- default: any
+local v3SelectedDisplays = {}
+local v3SelectedVariantSet = {["any"]=true}
 
 -- =============================================
 --  STATE & THREADS
@@ -1544,14 +1403,8 @@ local State = {
     AutoHoldCoil   = false,
 }
 
--- =============================================
---  AUTO HOLD COIL — Lock UUID & Spam
---  Megang coil manual 1x → UUID dikunci,
---  lalu di-spam terus sampai toggle OFF
--- =============================================
 local holdCoilLockedUUID = nil
 
--- Hook __namecall: deteksi UUID saat player pegang coil manual pertama kali
 do
     local mt  = getrawmetatable(game)
     local old = mt.__namecall
@@ -1573,6 +1426,7 @@ do
     end)
     setreadonly(mt, true)
 end
+
 local threads = {}
 
 local function stopThread(name)
@@ -1583,19 +1437,14 @@ local function stopThread(name)
 end
 
 -- =============================================
---  AUTO BRAINROT V3 — MAIN LOOP
+--  AUTO BRAINROT V3 MAIN LOOP
 -- =============================================
 local function startAutoBrainrotV3()
     threads.AutoBrainrotV3 = task.spawn(function()
 
-        -- Reset blacklist V3 tiap kali distart
         v3BlacklistPos = {}
         v3FailCount    = {}
 
-        -- waitRespawnAtBase: pakai fungsi global (lihat definisi di atas isAtBase)
-
-        -- ── FASE 1: Bangun validNests SEKALI di awal ──────────────────
-        -- Pakai rarity terendah dari semua brainrot yang dipilih
         local targetRarity = v3GetLowestRarity()
         local minNestId    = findMinNestForRarity(targetRarity)
 
@@ -1624,10 +1473,8 @@ local function startAutoBrainrotV3()
         local validNests = {}
         for idx = startIdx, #NEST_ORDER do
             local nId = NEST_ORDER[idx]
-            -- Nest valid kalau bisa spawn minimal 1 rarity dari brainrot yang dipilih
             local nestNeeded = false
             if next(v3TargetRarities) == nil then
-                -- Tidak ada filter → semua nest valid
                 nestNeeded = nestHasRarity(nId, targetRarity)
             else
                 for rar in pairs(v3TargetRarities) do
@@ -1641,16 +1488,13 @@ local function startAutoBrainrotV3()
                 if n[2] == nId then nDisplayName = n[1]; break end
             end
 
-            -- Pastikan di base dulu sebelum cek tiap nest
             if not isAtBase() then
                 HRP.CFrame = CFrame.new(BASE_POS)
                 task.wait(0.4)
             end
 
-            -- isNestUnlocked: FireServer enterNest + cek posisi HRP berubah
             local inCorrectNest = isNestUnlocked(nId)
 
-            -- Keluar dari nest sebelum ke nest berikutnya
             fireLeaveNest()
             task.wait(0.5)
 
@@ -1675,7 +1519,6 @@ local function startAutoBrainrotV3()
 
         if not State.AutoBrainrotV3 then return end
 
-        -- ── FASE 2: Rotasi nest SATU PER SATU ─────────────────────────
         local nestIdx = 1
         while State.AutoBrainrotV3 do
             local nestEntry        = validNests[nestIdx]
@@ -1683,12 +1526,9 @@ local function startAutoBrainrotV3()
             local nestToSearch     = nestEntry.id
             local nestToSearchName = nestEntry.name
 
-            -- Pastikan di base dulu (ikuti pola v3 referensi)
             Character = LP.Character or Character
             HRP       = Character and Character:FindFirstChild("HumanoidRootPart") or HRP
             if not isAtBase() then
-                -- fireLeaveNest dulu agar server release karakter,
-                -- baru CFrame ke base (tanpa leaveNest, CFrame sering di-reject server)
                 pcall(function() remContainer["game.nest.leaveNest"]:FireServer() end)
                 task.wait(0.4)
                 local char2 = LP.Character
@@ -1705,7 +1545,6 @@ local function startAutoBrainrotV3()
 
             if not State.AutoBrainrotV3 then break end
 
-            -- Fire enterNest, cek posisi berubah max 4 detik
             notify("Auto Brainrot V3", "▶ Masuk " .. nestToSearchName .. "...", 1)
             Character = LP.Character or Character
             HRP       = Character and Character:FindFirstChild("HumanoidRootPart") or HRP
@@ -1734,7 +1573,6 @@ local function startAutoBrainrotV3()
 
             notify("Auto Brainrot V3", "Scan 1 detik di " .. nestToSearchName .. "...", 2)
 
-            -- Scan tiap 0.1 detik, max 1 detik
             local spawnWait   = 0
             local firstPrompt = nil
             repeat
@@ -1753,7 +1591,6 @@ local function startAutoBrainrotV3()
                 continue
             end
 
-            -- Ada target! Grab
             local bestPrompt, promptPos = findBestV3(nestToSearch)
             if not bestPrompt then
                 fireLeaveNest()
@@ -1775,7 +1612,6 @@ local function startAutoBrainrotV3()
                 notify("Auto Brainrot V3", "Gagal grab, blacklist posisi...", 1)
                 if promptPos then table.insert(v3BlacklistPos, promptPos) end
                 fireLeaveNest()
-                -- Lanjut rotasi nest berikutnya
             else
                 local success = waitDropButton(3)
                 if success then
@@ -1788,7 +1624,6 @@ local function startAutoBrainrotV3()
                             gotName = n and tostring(n) or m.Name
                         end
                     end)
-                    -- FIX V3: setelah dropbutton visible → leave + base + KEMBALI ke nest yang sama + scan 1 detik
                     notify("Auto Brainrot V3", "✅ Dapat " .. gotName .. "! Leave → base → " .. nestToSearchName .. " lagi...", 3)
                     fireLeaveNest()
                     tweenToBase()
@@ -1796,7 +1631,6 @@ local function startAutoBrainrotV3()
 
                     if not State.AutoBrainrotV3 then break end
 
-                    -- Masuk kembali ke nest yang sama tanpa ganti nestIdx
                     notify("Auto Brainrot V3", "▶ Masuk lagi " .. nestToSearchName .. "...", 1)
                     Character = LP.Character or Character
                     HRP       = Character and Character:FindFirstChild("HumanoidRootPart") or HRP
@@ -1817,7 +1651,6 @@ local function startAutoBrainrotV3()
                     until reEntered or reElapsed >= 4
 
                     if reEntered then
-                        -- Scan 1 detik di nest yang sama
                         notify("Auto Brainrot V3", "Scan 1 detik di " .. nestToSearchName .. "...", 2)
                         local reScanWait = 0
                         local rePrompt   = nil
@@ -1830,7 +1663,6 @@ local function startAutoBrainrotV3()
                         until rePrompt or reScanWait >= 1 or not State.AutoBrainrotV3
 
                         if rePrompt then
-                            -- Ada lagi di nest yang sama → ulangi iterasi dengan nest index yang sama (--nestIdx trick)
                             nestIdx = nestIdx == 1 and #validNests or nestIdx - 1
                             notify("Auto Brainrot V3", "Ada lagi di " .. nestToSearchName .. "! Grab lagi...", 1)
                         else
@@ -1853,25 +1685,18 @@ local function startAutoBrainrotV3()
                                 "Skip (fail " .. v3FailCount[key] .. "/3), pindah...", 1)
                         end
                     end
-                    -- Lanjut rotasi nest berikutnya
                 end
             end
         end
-
     end)
 end
 
 -- =============================================
---  AUTO BRAINROT (manual — enter nest, tunggu drop)
+--  AUTO BRAINROT (manual)
 -- =============================================
 local function startAutoBrainrot()
     threads.AutoBrainrot = task.spawn(function()
-
-        -- Helper lokal: tunggu karakter hidup & confirmed di base
-        -- waitRespawnAtBase: pakai fungsi global (lihat definisi di atas isAtBase)
-
         while State.AutoBrainrot do
-            -- Pastikan di base & HRP fresh sebelum findActiveNest
             if not isAtBase() then
                 tpAndReset()
                 waitRespawnAtBase()
@@ -1892,8 +1717,6 @@ local function startAutoBrainrot()
             if not State.AutoBrainrot then break end
 
             if activeNest then
-                -- FIX: setelah masuk nest, tunggu DropButton visible
-                -- Begitu visible → langsung leave + tween base → cari nest aktif lagi
                 local takeSpam = task.spawn(function()
                     while State.AutoBrainrot do
                         notify("Auto Brainrot", "Menunggu brainrot di " .. activeNest[1] .. "...", 1)
@@ -1910,15 +1733,12 @@ local function startAutoBrainrot()
                 task.cancel(takeSpam)
                 if not State.AutoBrainrot then break end
 
-                -- DropButton visible → dapat brainrot! Leave nest → tween ke base
                 notify("Auto Brainrot", "✅ Drop! Leave → base → cari nest lagi...", 2)
                 fireLeaveNest()
                 tweenToBase()
                 waitArrivedAtBase()
                 notify("Auto Brainrot", "Kembali ke base. Cari nest aktif...", 1)
-                -- Loop akan langsung findActiveNest() lagi di iterasi berikutnya
             else
-                -- Tidak ada nest aktif, tunggu sebentar lalu coba lagi
                 notify("Auto Brainrot", "Nest tidak ditemukan, coba lagi...", 2)
                 task.wait(1)
             end
@@ -1927,16 +1747,11 @@ local function startAutoBrainrot()
 end
 
 -- =============================================
---  AUTO NEAREST BRAINROT (otomatis — grab prioritas)
+--  AUTO NEAREST BRAINROT
 -- =============================================
 local function startAutoNearestBrainrot()
     threads.AutoNearest = task.spawn(function()
-
-        -- Helper lokal: tunggu karakter hidup & confirmed di base
-        -- waitRespawnAtBase: pakai fungsi global (lihat definisi di atas isAtBase)
-
         while State.AutoNearest do
-            -- Pastikan di base & HRP fresh sebelum findActiveNest
             if not isAtBase() then
                 tpAndReset()
                 waitRespawnAtBase()
@@ -1959,7 +1774,6 @@ local function startAutoNearestBrainrot()
             if activeNest then
                 notify("Auto Nearest", "Masuk: " .. activeNest[1], 2)
 
-                -- Tunggu brainrot spawn (max 5 detik polling tiap 0.1s)
                 local spawnWait = 0
                 local firstPrompt = nil
                 repeat
@@ -1973,19 +1787,16 @@ local function startAutoNearestBrainrot()
                 if not State.AutoNearest then break end
 
                 if not firstPrompt then
-                    -- Nest benar-benar kosong, balik cari nest lain
                     notify("Auto Nearest", "Nest kosong, cari nest lain...", 2)
                     tpAndReset()
                     waitRespawnAtBase()
                 else
                     while State.AutoNearest do
-                        -- Re-scan fresh setiap iterasi (termasuk setelah skip Robux)
                         Character = LP.Character or Character
                         HRP = Character and Character:FindFirstChild("HumanoidRootPart") or HRP
 
                         local bestPrompt, bestScore, mutasiName = findBest(blacklistedPositions, activeNest[2])
                         if not bestPrompt then
-                            -- Tunggu respawn brainrot max 3 detik sebelum beneran balik
                             local retryWait = 0
                             while retryWait < 3 and State.AutoNearest do
                                 task.wait(0.1)
@@ -2003,10 +1814,8 @@ local function startAutoNearestBrainrot()
 
                         local _, promptPos = getModelFromPrompt(bestPrompt)
 
-                        -- Re-scan tepat sebelum tween: pastikan masih best & masih di bounds
                         local confirmPrompt, confirmScore, confirmName = findBest(blacklistedPositions, activeNest[2])
                         if confirmPrompt ~= bestPrompt then
-                            -- Ada yang lebih baik atau prompt sudah ganti, scan ulang dari atas
                             notify("Auto Nearest", "Target berubah, scan ulang...", 1)
                             task.wait(0.05)
                         else
@@ -2016,25 +1825,19 @@ local function startAutoNearestBrainrot()
 
                             if not grabbed then
                                 notify("Auto Nearest", "Gagal/despawn/keluar bounds, scan ulang...", 1)
-                                if promptPos then
-                                    table.insert(blacklistedPositions, promptPos)
-                                end
+                                if promptPos then table.insert(blacklistedPositions, promptPos) end
                                 task.wait(0.1)
                             else
                                 local success = waitDropButton(3)
                                 if success then
-                                    -- FIX: setelah dropbutton visible → leave + base → cari nest aktif lagi
                                     notify("Auto Nearest", "✅ Berhasil! Leave → base → cari nest lagi...", 2)
                                     fireLeaveNest()
                                     tweenToBase()
                                     waitArrivedAtBase()
-                                    -- break keluar dari inner while → loop utama akan findActiveNest() lagi
                                     break
                                 else
                                     notify("Auto Nearest", "Skip (Robux/gagal), cari lain...", 2)
-                                    if promptPos then
-                                        table.insert(blacklistedPositions, promptPos)
-                                    end
+                                    if promptPos then table.insert(blacklistedPositions, promptPos) end
                                     task.wait(0.15)
                                 end
                             end
@@ -2044,23 +1847,19 @@ local function startAutoNearestBrainrot()
                     notify("Auto Nearest", "Loop ulang, cari nest aktif...", 1)
                 end
             else
-                -- Tidak ada nest aktif, tunggu sebentar lalu coba lagi
                 notify("Auto Nearest", "Nest tidak ditemukan, coba lagi...", 2)
                 task.wait(1)
             end
         end
     end)
 end
---  → langsung TP ke nest yang dipilih, tanpa scan semua nest
+
+-- =============================================
+--  AUTO NEAREST V2
 -- =============================================
 local function startAutoNearestBrainrotV2()
     threads.AutoNearestV2 = task.spawn(function()
-
-        -- Helper: tunggu karakter respawn (hidup kembali) & confirmed di base, lalu update HRP
-        -- waitRespawnAtBase: pakai fungsi global (lihat definisi di atas isAtBase)
-
         while State.AutoNearestV2 do
-            -- Pastikan di base (pola v3 referensi)
             Character = LP.Character or Character
             HRP       = Character and Character:FindFirstChild("HumanoidRootPart") or HRP
             if not isAtBase() then
@@ -2107,7 +1906,6 @@ local function startAutoNearestBrainrotV2()
             Character = LP.Character or Character
             HRP = Character and Character:FindFirstChild("HumanoidRootPart") or HRP
 
-            -- Tunggu brainrot spawn setelah masuk nest (max 5 detik polling tiap 0.1s)
             local spawnWait = 0
             local firstPrompt = nil
             notify("Auto Nearest V2", "Tunggu brainrot spawn...", 1)
@@ -2126,20 +1924,17 @@ local function startAutoNearestBrainrotV2()
                 tpAndReset()
                 task.wait(0.3)
             else
-                -- Loop grab brainrot di dalam nest
                 while State.AutoNearestV2 do
                     if selectedNestId ~= nestId then
                         notify("Auto Nearest V2", "Nest diganti, pindah...", 1)
                         break
                     end
 
-                    -- Re-scan fresh setiap iterasi (termasuk setelah skip Robux)
                     Character = LP.Character or Character
                     HRP = Character and Character:FindFirstChild("HumanoidRootPart") or HRP
 
                     local bestPrompt, bestScore, mutasiName = findBest(blacklistedPositions, nestId)
                     if not bestPrompt then
-                        -- Retry tunggu respawn brainrot max 3 detik sebelum beneran balik
                         local retryWait = 0
                         while retryWait < 3 and State.AutoNearestV2 do
                             task.wait(0.1)
@@ -2157,7 +1952,6 @@ local function startAutoNearestBrainrotV2()
 
                     local _, promptPos = getModelFromPrompt(bestPrompt)
 
-                    -- Re-scan tepat sebelum tween: pastikan masih best & masih di bounds
                     local confirmPrompt2, _, confirmName2 = findBest(blacklistedPositions, nestId)
                     if confirmPrompt2 ~= bestPrompt then
                         notify("Auto Nearest V2", "Target berubah, scan ulang...", 1)
@@ -2169,25 +1963,19 @@ local function startAutoNearestBrainrotV2()
 
                         if not grabbed then
                             notify("Auto Nearest V2", "Gagal/despawn/keluar bounds, scan ulang...", 1)
-                            if promptPos then
-                                table.insert(blacklistedPositions, promptPos)
-                            end
+                            if promptPos then table.insert(blacklistedPositions, promptPos) end
                             task.wait(0.1)
                         else
                             local success = waitDropButton(3)
                             if success then
-                                -- FIX: setelah dropbutton visible → leave + base → TP ke nest yang dipilih lagi
                                 notify("Auto Nearest V2", "✅ Berhasil! Leave → base → masuk " .. nestName .. " lagi...", 2)
                                 fireLeaveNest()
                                 tweenToBase()
                                 waitArrivedAtBase()
-                                -- break keluar dari inner while → loop utama akan enterNest selectedNestId lagi
                                 break
                             else
                                 notify("Auto Nearest V2", "Skip (Robux/gagal), cari lain...", 2)
-                                if promptPos then
-                                    table.insert(blacklistedPositions, promptPos)
-                                end
+                                if promptPos then table.insert(blacklistedPositions, promptPos) end
                                 task.wait(0.15)
                             end
                         end
@@ -2201,16 +1989,11 @@ local function startAutoNearestBrainrotV2()
 end
 
 -- =============================================
---  AUTO BRAINROT V2 (pilih nest + otomatis)
+--  AUTO BRAINROT V2
 -- =============================================
 local function startAutoBrainrotV2()
     threads.AutoBrainrotV2 = task.spawn(function()
-
-        -- Helper: tunggu karakter respawn & balik ke base, update HRP
-        -- waitRespawnAtBase: pakai fungsi global (lihat definisi di atas isAtBase)
-
         while State.AutoBrainrotV2 do
-            -- Pastikan di base (pola v3 referensi)
             Character = LP.Character or Character
             HRP       = Character and Character:FindFirstChild("HumanoidRootPart") or HRP
             if not isAtBase() then
@@ -2264,7 +2047,6 @@ local function startAutoBrainrotV2()
             task.cancel(takeSpam)
             if not State.AutoBrainrotV2 then break end
 
-            -- FIX: setelah dropbutton visible → leave + base → TP ke nest yang dipilih lagi
             if success then
                 notify("Auto Brainrot V2", "✅ Drop! Leave → base → masuk " .. nestName .. " lagi...", 2)
             else
@@ -2273,7 +2055,6 @@ local function startAutoBrainrotV2()
             fireLeaveNest()
             tweenToBase()
             waitArrivedAtBase()
-            -- Loop akan langsung masuk ke selectedNestId lagi di iterasi berikutnya
         end
     end)
 end
@@ -2297,7 +2078,6 @@ TabMain:Toggle({
     ["Callback"] = function(v)
         State.AutoNearest = v
         if v then
-            -- Reset ke maximize saat radar dibuka
             setMinimized(false)
             mainFrame.Size = UDim2.fromOffset(RADAR_W, RADAR_H)
             mainFrame.Visible = true
@@ -2309,7 +2089,6 @@ TabMain:Toggle({
     end,
 })
 
--- ── Buat list nama nest untuk dropdown V2 ─────────────────────────
 local nestNames = {}
 for _, n in ipairs(nests) do
     table.insert(nestNames, n[1])
@@ -2361,14 +2140,12 @@ TabMainV2:Toggle({
     end,
 })
 
--- ── AUTO BRAINROT V3 UI ──────────────────────────────────────────
 TabMainV2:Dropdown({
     ["Title"]   = "V3 · Pilih Brainrot (multi)",
     ["Values"]  = v3BrainrotDisplayList,
     ["Default"] = v3BrainrotDisplayList[1],
     ["Multi"]   = true,
     ["Callback"] = function(val)
-        -- val bisa string (single) atau table (multi) tergantung library
         v3TargetBrainrots = {}
         v3TargetRarities  = {}
         local function addEntry(v)
@@ -2377,7 +2154,6 @@ TabMainV2:Dropdown({
                 local norm = data.name:lower():gsub("%s+","")
                 v3TargetBrainrots[norm] = true
                 v3TargetRarities[data.rarity] = true
-                -- compat single
                 v3TargetBrainrot = data.name:lower()
                 v3TargetRarity   = data.rarity
             end
@@ -2387,7 +2163,6 @@ TabMainV2:Dropdown({
         else
             addEntry(val)
         end
-        -- Hitung jumlah yang dipilih
         local count = 0
         for _ in pairs(v3TargetBrainrots) do count += 1 end
         notify("V3", count .. " brainrot dipilih", 2)
@@ -2403,7 +2178,7 @@ TabMainV2:Dropdown({
         v3TargetVariants = {}
         local function addVariant(v)
             v3TargetVariants[v] = true
-            v3TargetVariant = v  -- compat
+            v3TargetVariant = v
             v3SelectedVariantSet[v] = true
         end
         if type(val) == "table" then
@@ -2411,7 +2186,6 @@ TabMainV2:Dropdown({
         else
             addVariant(val)
         end
-        -- Kalau "any" dipilih, clear yang lain
         if v3TargetVariants["any"] then
             v3TargetVariants = {["any"]=true}
         end
@@ -2427,7 +2201,6 @@ TabMainV2:Toggle({
     ["Callback"] = function(v)
         State.AutoBrainrotV3 = v
         if v then
-            -- Gunakan rarity terendah dari semua target
             local targetRarity = v3GetLowestRarity()
             local minNestId = findMinNestForRarity(targetRarity)
             if not minNestId then
@@ -2439,7 +2212,6 @@ TabMainV2:Toggle({
             for _, n in ipairs(nests) do
                 if n[2] == minNestId then minNestName = n[1]; break end
             end
-            -- Hitung berapa brainrot & variant yang dipilih
             local bCount = 0; for _ in pairs(v3TargetBrainrots) do bCount += 1 end
             local vCount = 0; for _ in pairs(v3TargetVariants) do vCount += 1 end
             local anyVariant = v3TargetVariants["any"] or vCount == 0
@@ -2567,7 +2339,7 @@ TabMain:Toggle({
 })
 
 -- =============================================
---  AUTO FUSE
+--  AUTO FUSE (+ Lord Veyrath)
 -- =============================================
 local FUSE_LIST = {
     "tralala",
@@ -2577,6 +2349,7 @@ local FUSE_LIST = {
     "rengRongo",
     "lordoRobo",
     "kingFalken",
+    "lordVeyrath",
 }
 
 local selectedFuse = FUSE_LIST[1]
@@ -2615,7 +2388,7 @@ TabMain:Toggle({
 })
 
 -- =============================================
---  UI — TAB TELEPORT
+--  UI — TAB TELEPORT (+ Lord Veyrath)
 -- =============================================
 TabTP:Button({
     ["Title"]    = "Claim Brainrot To Base",
@@ -2648,43 +2421,38 @@ for _, nest in ipairs(nests) do
     })
 end
 
-notify("Rilzz Hub", "Script loaded!", 3)
+notify("Rilzz Hub", "Script loaded! ✅ Updated with Lord Veyrath nest!", 3)
 
 -- =============================================
---  TAB: TOKEN MACHINE
+--  TAB: TOKEN MACHINE (Updated sesuai foto)
 -- =============================================
 local TabToken = Window:Tab({ ["Title"] = "Token", ["Icon"] = "coins" })
 
--- List brainrot yang bisa di-recycle di Token Machine
+-- ✅ UPDATE: List sesuai foto Token Machine
 local TOKEN_BRAINROTS = {
-    { "Cupitron UFO",         "cupitronUFO"          },
-    { "Frogzo Soda",          "frogzoSoda"           },
-    { "Tech Scorpio",         "techScorpio"          },
-    { "Singularo Assassino",  "singularoAssassino"   },
-    { "Croco Bling",          "crocoBling"           },
-    { "Tralala Tralalita",    "tralalaTralalita"     },
-    { "Reptistono",           "reptistono"           },
-    { "Elecco Bee",           "eleccoBee"            },
-    { "Pineaplino",           "pineaplino"           },
-    { "Vulture",              "vulture"              },
-    { "Reng Rongo",           "rengRongo"            },
-    { "Lordo Robo",           "lordoRobo"            },
-    { "King Falken",          "kingFalken"           },
-    { "Piectopus",            "piectopus"            },
-    { "Tracto Dino",          "tractoDino"           },
-    { "Fire Dragon",          "fireDragon"           },
-    { "Fire Medusa",          "fireMedusa"           },
-    { "Fire Cappuccino",      "fireCappuccino"       },
-    { "Sado Bananito",        "sadoBananito"         },
-    { "Grappemino Dojo",      "grappeminoDojo"       },
-    { "Tech Dimon",           "techDimon"            },
-    { "Sado Skeletono",       "sadoSkeletono"        },
-    { "Grappellino Doro",     "grappellinoDoro"      },
-    { "Din Din Valluero",     "dinDinValluero"       },
-    { "Strawberry Elephant",  "strawberryElephant"   },
-    { "Martino Gravitino",    "martinoGravitino"     },
-    { "Stoupo Traffico",      "stoupoTraffico"       },
-    { "Cupitron UFO",         "cupitronUFO"          },
+    -- Singularity (Craft)
+    { "Tralala Tralalita",   "tralalaTralalita"   },
+    { "Reptistono",          "reptistono"         },
+    { "Elecco Bee",          "eleccoBee"          },
+    -- Eternal (Craft)
+    { "Pineaplino",          "pineaplino"         },
+    { "Vulture",             "vulture"            },
+    -- Paradox (Craft)
+    { "Reng Rongo",          "rengRongo"          },
+    { "Lordo Robo",          "lordoRobo"          },
+    { "King Falken",         "kingFalken"         },
+    { "Piectopus",           "piectopus"          },
+    { "Lord Veyrath",        "lordVeyrath"        },
+    -- Celestial
+    { "Frogzo Soda",         "frogzoSoda"         },
+    -- Divine
+    { "Cupitron UFO",        "cupitronUFO"        },
+    -- Infinity
+    { "Tech Scorpio",        "techScorpio"        },
+    -- Singularity
+    { "Singularo Assassino", "singularoAssassino" },
+    -- Eternal
+    { "Croco Bling",         "crocoBling"         },
 }
 
 -- Hapus duplikat
@@ -2705,7 +2473,6 @@ local selectedTokenBrainrotName = TOKEN_BRAINROTS[1][1]
 local autoTokenRunning = false
 local autoTokenThread  = nil
 
--- Dropdown pilih brainrot
 local tokenDropdownValues = {}
 for _, v in ipairs(TOKEN_BRAINROTS) do
     table.insert(tokenDropdownValues, v[1])
@@ -2727,7 +2494,6 @@ TabToken:Dropdown({
     end,
 })
 
--- Tombol recycle sekali
 TabToken:Button({
     ["Title"]    = "Recycle Sekali",
     ["Callback"] = function()
@@ -2738,7 +2504,6 @@ TabToken:Button({
     end,
 })
 
--- Toggle auto recycle loop
 TabToken:Toggle({
     ["Title"]   = "Auto Recycle Loop",
     ["Default"] = false,
