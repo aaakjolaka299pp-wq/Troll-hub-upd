@@ -1,0 +1,206 @@
+if game:GetService("CoreGui"):FindFirstChild("ToraScript") then
+    game:GetService("CoreGui").ToraScript:Destroy()
+end
+
+local gal_l44 = loadstring(game:HttpGet("https://raw.githubusercontent.com/liebertsx/Tora-Library/main/src/librarynew", true))()
+local Lucky = gal_l44:CreateWindow("Lucky Block Game")
+
+-- ==================== SLOT SELECTOR (untuk Auto Dupe) ====================
+local selectedSlot = 3 -- default slot 3
+
+Lucky:AddSlider({
+    text = "Dupe Slot",
+    flag = "dupeSlot",
+    min = 1,
+    max = 30,
+    default = 3,
+    callback = function(val)
+        selectedSlot = val
+    end
+})
+
+-- ==================== AUTO DUPE ====================
+local function Dupe()
+    task.spawn(function()
+        _G.Dupe = true
+        while _G.Dupe do
+            task.wait(0.1)
+            pcall(function()
+                game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("SwapBrainrotEvent"):FireServer(tostring(selectedSlot))
+            end)
+        end
+    end)
+end
+
+Lucky:AddToggle({
+    text = "Auto Dupe",
+    flag = "toggleDupe",
+    state = false,
+    callback = function(state)
+        _G.Dupe = state
+        if state then Dupe() end
+    end
+})
+
+-- ==================== INSTANT BEST LUCK ====================
+local function Block()
+    task.spawn(function()
+        _G.Block = true
+        while _G.Block do
+            task.wait(0.5)
+            pcall(function()
+                local LP = game:GetService("Players").LocalPlayer
+                local RS = game:GetService("ReplicatedStorage")
+
+                -- Step 1: Mulai run
+                firetouchinterest(LP.Character.HumanoidRootPart, workspace.StartPad.Pad, 0)
+                task.wait(0.1)
+                firetouchinterest(LP.Character.HumanoidRootPart, workspace.StartPad.Pad, 1)
+                task.wait(1.5)
+
+                -- Step 2: Fire pintu HIJAU dengan nilai POSITIF saja
+                local SpawnedDoors = workspace:FindFirstChild("SpawnedDoors")
+                if SpawnedDoors then
+                    for _, door in pairs(SpawnedDoors:GetChildren()) do
+                        local val = door:GetAttribute("DoorValue")
+                        local op = door:GetAttribute("DoorOp")
+                        if door.Name == "Green" and val and val > 0 then
+                            RS.Remotes.DoorEvent:FireServer(val, op)
+                            task.wait(0.05)
+                        end
+                    end
+                end
+
+                task.wait(0.3)
+
+                -- Step 3: Finish run dengan fire CurrentHP
+                local currentHP = LP:GetAttribute("CurrentHP")
+                if currentHP and currentHP > 0 then
+                    RS.Remotes.DamageEvent:FireServer(currentHP)
+                end
+
+                task.wait(1)
+            end)
+        end
+    end)
+end
+
+Lucky:AddToggle({
+    text = "Instant Best Luck",
+    flag = "toggle",
+    state = false,
+    callback = function(state)
+        _G.Block = state
+        if state then Block() end
+    end
+})
+
+-- ==================== COLLECT CASH ====================
+local function Cash()
+    task.spawn(function()
+        _G.Cash = true
+        while _G.Cash do
+            task.wait()
+            pcall(function()
+                local LP = game:GetService("Players").LocalPlayer
+                local base = workspace.Bases[LP:GetAttribute("Base")]
+                for _, floor in pairs({"Floor1", "Floor2", "Floor3"}) do
+                    local floorFolder = base:FindFirstChild(floor)
+                    if floorFolder then
+                        local platforms = floorFolder:FindFirstChild("Platforms")
+                        if platforms then
+                            for _, platform in pairs(platforms:GetChildren()) do
+                                local collect = platform:FindFirstChild("Collect")
+                                if collect then
+                                    firetouchinterest(LP.Character.HumanoidRootPart, collect, 0)
+                                    task.wait(0.05)
+                                    firetouchinterest(LP.Character.HumanoidRootPart, collect, 1)
+                                    task.wait(0.05)
+                                end
+                            end
+                        end
+                    end
+                end
+                task.wait(2)
+            end)
+        end
+    end)
+end
+
+Lucky:AddToggle({
+    text = "Collect Cash",
+    flag = "toggle2",
+    state = false,
+    callback = function(state)
+        _G.Cash = state
+        if state then Cash() end
+    end
+})
+
+-- ==================== UPGRADE ALL ====================
+local function Upgrade()
+    task.spawn(function()
+        _G.Upgrade = true
+        while _G.Upgrade do
+            task.wait()
+            pcall(function()
+                local LP = game:GetService("Players").LocalPlayer
+                local base = workspace.Bases[LP:GetAttribute("Base")]
+                local UpgradeEvent = game:GetService("ReplicatedStorage").Remotes.UpgradeBrainrotEvent
+                for _, floor in pairs({"Floor1", "Floor2", "Floor3"}) do
+                    local floorFolder = base:FindFirstChild(floor)
+                    if floorFolder then
+                        local platforms = floorFolder:FindFirstChild("Platforms")
+                        if platforms then
+                            for _, platform in pairs(platforms:GetChildren()) do
+                                local slotNum = tonumber(platform.Name)
+                                if slotNum then
+                                    UpgradeEvent:FireServer(slotNum)
+                                    task.wait(0.1)
+                                end
+                            end
+                        end
+                    end
+                end
+                task.wait(1)
+            end)
+        end
+    end)
+end
+
+Lucky:AddToggle({
+    text = "Upgrade All",
+    flag = "toggle3",
+    state = false,
+    callback = function(state)
+        _G.Upgrade = state
+        if state then Upgrade() end
+    end
+})
+
+-- ==================== AUTO REBIRTH ====================
+local function Rebirth()
+    task.spawn(function()
+        _G.Rebirth = true
+        while _G.Rebirth do
+            task.wait(1)
+            pcall(function()
+                game:GetService("ReplicatedStorage").Remotes.RebirthEvent:FireServer()
+            end)
+        end
+    end)
+end
+
+Lucky:AddToggle({
+    text = "Auto Rebirth",
+    flag = "toggle4",
+    state = false,
+    callback = function(state)
+        _G.Rebirth = state
+        if state then Rebirth() end
+    end
+})
+
+Lucky:AddLabel({ text = "YouTube: RilzzHub" })
+
+gal_l44:Init()
