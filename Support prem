@@ -27,7 +27,8 @@ local SupportedMaps = {
     [91723890596097] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Fish%20a%20slime", 
     [119822977170203] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Power%20blast%20for%20brainrot", 
     [95223801959482] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Brainrott%20Sniper", 
-    [103311003648859] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Lucky%20Block%20Game"
+    [103311003648859] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Lucky%20Block%20Game", 
+    [123457670966462] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Get%20launch"
 }
 
 
