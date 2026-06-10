@@ -1,0 +1,316 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+if not player then
+    player = Players.PlayerAdded:Wait()
+end
+
+local playerGui = player:WaitForChild("PlayerGui")
+local HUD = playerGui:WaitForChild("GUI"):WaitForChild("HUD")
+
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/liebertsx/Tora-Library/main/src/librarynew", true))()
+local tab = library:CreateWindow("Rilzz Hub Nich Deck")
+
+-- ========================
+-- HELPERS
+-- ========================
+local function getHRP()
+    local char = player.Character or player.CharacterAdded:Wait()
+    return char:WaitForChild("HumanoidRootPart")
+end
+
+local function getMyLot()
+    return workspace:FindFirstChild("Plot_" .. player.Name)
+end
+
+local function tweenTo(targetCFrame)
+    local hrp = getHRP()
+    if not hrp then return end
+    local tween = TweenService:Create(hrp, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {
+        CFrame = targetCFrame
+    })
+    tween:Play()
+    tween.Completed:Wait()
+end
+
+local function getBrainrotTool()
+    local backpack = player:FindFirstChild("Backpack")
+    if not backpack then return nil end
+    for _, tool in pairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and not tool.Name:lower():find("aura") and not tool.Name:lower():find("log") then
+            return tool
+        end
+    end
+    local char = player.Character
+    if char then
+        for _, tool in pairs(char:GetChildren()) do
+            if tool:IsA("Tool") and not tool.Name:lower():find("aura") and not tool.Name:lower():find("log") then
+                return tool
+            end
+        end
+    end
+    return nil
+end
+
+local function getNearestPrompt(actionText)
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+
+    local nearestPrompt = nil
+    local shortestDistance = math.huge
+
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("ProximityPrompt") and v.Enabled and v.ActionText == actionText then
+            if v.ObjectText:lower():find("swap") or v.ActionText:lower():find("swap") or v.Parent.Name:lower():find("swap") then
+                continue
+            end
+
+            local parent = v.Parent
+            local pos
+
+            if parent:IsA("BasePart") then
+                pos = parent.Position
+            elseif parent:IsA("Attachment") and parent.Parent:IsA("BasePart") then
+                pos = parent.WorldPosition
+            end
+
+            if pos then
+                local dist = (hrp.Position - pos).Magnitude
+                if dist < shortestDistance then
+                    shortestDistance = dist
+                    nearestPrompt = v
+                end
+            end
+        end
+    end
+
+    return nearestPrompt
+end
+
+local function unequipBrainrot()
+    local char = player.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    for _, tool in pairs(char:GetChildren()) do
+        if tool:IsA("Tool") and not tool.Name:lower():find("aura") and not tool.Name:lower():find("log") then
+            humanoid:UnequipTools()
+            return
+        end
+    end
+end
+
+local function getPromptPosition(prompt)
+    local parent = prompt.Parent
+    if parent:IsA("BasePart") then
+        return parent.Position
+    elseif parent:IsA("Attachment") and parent.Parent:IsA("BasePart") then
+        return parent.Parent.Position
+    end
+    return nil
+end
+
+local function waitForRespawn()
+    repeat task.wait(0.05) until Players.LocalPlayer
+    local p = Players.LocalPlayer
+    local newChar = p.Character
+    if not newChar or not newChar.Parent then
+        newChar = p.CharacterAdded:Wait()
+    end
+    repeat task.wait(0.05) until newChar:FindFirstChild("HumanoidRootPart") and newChar:FindFirstChild("Humanoid")
+    task.wait(0.15)
+end
+
+-- ========================
+-- TOGGLES
+-- ========================
+_G.dupe = false
+_G.autoCash = false
+_G.autoTrain = false
+_G.autoRebirth = false
+
+local folderDupe = tab:AddFolder("Dupe")
+local folderAuto = tab:AddFolder("Auto")
+
+folderDupe:AddToggle({
+    text = "Dupe",
+    flag = "dupe",
+    value = false,
+    callback = function(val)
+        _G.dupe = val
+    end
+})
+
+folderAuto:AddToggle({
+    text = "Auto Collect Cash",
+    flag = "autoCash",
+    value = false,
+    callback = function(val)
+        _G.autoCash = val
+    end
+})
+
+folderAuto:AddToggle({
+    text = "Auto Train",
+    flag = "autoTrain",
+    value = false,
+    callback = function(val)
+        _G.autoTrain = val
+    end
+})
+
+folderAuto:AddToggle({
+    text = "Auto Rebirth",
+    flag = "autoRebirth",
+    value = false,
+    callback = function(val)
+        _G.autoRebirth = val
+    end
+})
+
+library:Init()
+
+-- ========================
+-- DUPE LOOP
+-- ========================
+coroutine.wrap(function()
+    while true do
+        task.wait(0.1)
+        if not _G.dupe then continue end
+
+        pcall(function()
+            local myLot = getMyLot()
+            if not myLot then return end
+
+            -- PHASE 1: PLACE
+            while _G.dupe do
+                local placePrompt = getNearestPrompt("Place Item")
+                if not placePrompt then break end
+
+                -- Tween ke prompt
+                local pos = getPromptPosition(placePrompt)
+                if pos then tweenTo(CFrame.new(pos)) end
+                task.wait(0.1)
+
+                -- Equip tool
+                local tool = getBrainrotTool()
+                if not tool then break end
+
+                local char = player.Character or player.CharacterAdded:Wait()
+                local humanoid = char:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid:EquipTool(tool)
+                    task.wait(0.1)
+                end
+
+                -- Kill
+                local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+                if hum then hum.Health = 0 end
+
+                -- Tunggu respawn
+                waitForRespawn()
+
+                -- Tween ke prompt lagi
+                local freshPrompt = getNearestPrompt("Place Item")
+                if not freshPrompt then break end
+
+                local freshPos = getPromptPosition(freshPrompt)
+                if freshPos then tweenTo(CFrame.new(freshPos)) end
+                task.wait(0.1)
+
+                -- Fire place
+                fireproximityprompt(freshPrompt)
+                task.wait(0.5)
+            end
+
+            -- PHASE 2: PICKUP
+            while _G.dupe do
+                local pickupPrompt = getNearestPrompt("Pick Up")
+                if not pickupPrompt then break end
+
+                local pos = getPromptPosition(pickupPrompt)
+                if pos then tweenTo(CFrame.new(pos) + Vector3.new(0, 3, 0)) end
+                task.wait(0.1)
+
+                fireproximityprompt(pickupPrompt)
+                task.wait(0.2)
+
+                task.wait(0.1)
+                unequipBrainrot()
+            end
+        end)
+    end
+end)()
+
+-- ========================
+-- AUTO COLLECT CASH
+-- ========================
+coroutine.wrap(function()
+    while true do
+        task.wait(1)
+        if not _G.autoCash then continue end
+        pcall(function()
+            local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+            local plot = getMyLot()
+            if not plot then return end
+            for _, obj in pairs(plot:GetDescendants()) do
+                if obj.Name == "CollectTouch" or obj.Name == "Collect_Under" then
+                    firetouchinterest(hrp, obj, 0)
+                    task.wait(0.05)
+                    firetouchinterest(hrp, obj, 1)
+                end
+            end
+        end)
+    end
+end)()
+
+-- ========================
+-- AUTO TRAIN
+-- ========================
+local function HookTap(obj)
+    if obj.Name ~= "TrainingLogTapPrompt" then return end
+    task.spawn(function()
+        while obj and obj.Parent do
+            if not _G.autoTrain then task.wait(0.1) continue end
+            if obj.Visible then
+                pcall(function()
+                    for _, conn in pairs(getconnections(obj.Activated)) do
+                        conn.Function()
+                    end
+                    for _, conn in pairs(getconnections(obj.MouseButton1Click)) do
+                        conn.Function()
+                    end
+                end)
+                task.wait(0.05)
+            else
+                task.wait(0.1)
+            end
+        end
+    end)
+end
+
+HUD.DescendantAdded:Connect(HookTap)
+for _, v in pairs(HUD:GetDescendants()) do HookTap(v) end
+
+-- ========================
+-- AUTO REBIRTH
+-- ========================
+coroutine.wrap(function()
+    while true do
+        task.wait(1)
+        if not _G.autoRebirth then continue end
+        pcall(function()
+            local btn = playerGui.GUI.Frames.Rebirth.Rebirth
+            if btn and btn.Visible then
+                for _, conn in pairs(getconnections(btn.MouseButton1Click)) do
+                    conn.Function()
+                end
+                for _, conn in pairs(getconnections(btn.Activated)) do
+                    conn.Function()
+                end
+            end
+        end)
+    end
+end)()
