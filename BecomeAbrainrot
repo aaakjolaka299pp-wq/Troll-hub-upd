@@ -86,6 +86,41 @@ local function doFuse()
 end
 
 -- ========================
+-- SUMMON BRAINROT
+-- ========================
+local function doSummonBrainrot()
+    pcall(function()
+        local args = {
+            workspace:WaitForChild("Locations"):WaitForChild("End")
+        }
+        ReplicatedStorage:WaitForChild("Events"):WaitForChild("SummonBrainrots"):FireServer(unpack(args))
+    end)
+end
+
+-- ========================
+-- TELEPORT
+-- ========================
+local function doTeleport(pos)
+    local char = Player.Character or Player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    hrp.CFrame = CFrame.new(pos)
+end
+
+local function doTpBestArea()
+    pcall(function()
+        doTeleport(Vector3.new(50.5, 2.1, -16.2))
+        task.wait(1)
+        doTeleport(Vector3.new(43.6, 2.7, -1453.7))
+    end)
+end
+
+local function doTpSpawn()
+    pcall(function()
+        doTeleport(Vector3.new(48.1, 4.2, -7.5))
+    end)
+end
+
+-- ========================
 -- LOOPS
 -- ========================
 task.spawn(function()
@@ -141,6 +176,35 @@ folder:AddToggle({
     flag     = "auto_rebirth",
     callback = function(v)
         AutoRebirth = v
+    end
+})
+
+-- ========================
+-- GUI — NEW FEATURES
+-- ========================
+local folder2 = tab:AddFolder("Utilities")
+
+folder2:AddButton({
+    text     = "Summon Brainrot",
+    flag     = "summon_brainrot",
+    callback = function()
+        doSummonBrainrot()
+    end
+})
+
+folder2:AddButton({
+    text     = "Tp Best Area",
+    flag     = "tp_best_area",
+    callback = function()
+        doTpBestArea()
+    end
+})
+
+folder2:AddButton({
+    text     = "Tp Spawn",
+    flag     = "tp_spawn",
+    callback = function()
+        doTpSpawn()
     end
 })
 
