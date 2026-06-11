@@ -1,0 +1,771 @@
+local gal1 = true
+if gal1 then
+    local Rilzz = loadstring(game:HttpGet("https://pastefy.app/mPtQVFoh/raw?part=addon.lua"))()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local RunService        = game:GetService("RunService")
+    local LocalPlayer       = game:GetService("Players").LocalPlayer
+
+    local Shared   = ReplicatedStorage:WaitForChild("Shared")
+    local Packages = Shared:WaitForChild("Packages")
+    local Net      = Packages:WaitForChild("Net")
+
+    local gal27 = Net:WaitForChild("RE/ClaimGold")
+    local gal28 = Net:WaitForChild("RE/UnlockSlot")
+    local gal29 = Net:WaitForChild("RE/UpgradeBrainrot")
+    local gal30 = Net:WaitForChild("RE/RebirthUp")
+    local gal31 = Net:WaitForChild("RE/DroneLevelUp")
+    local gal32 = Net:WaitForChild("RE/ShieldLevelUp")
+    local gal36 = Net:WaitForChild("RE/SellAllBrainrot")
+    local gal37 = Net:WaitForChild("RF/ClaimOnlineReward")
+    local gal38 = Net:WaitForChild("RE/BrainrotAttack")
+    local gal39 = Net:WaitForChild("RF/DroneRequest")
+    local gal40 = Net:WaitForChild("RF/DroneCapture")
+    local gal41 = Net:WaitForChild("RE/DroneClaim")
+
+    local gal43 = {
+        AutoCash        = false,
+        AutoUpgradeBase = false,
+        AutoBrainrot    = false,
+        AutoRebirth     = false,
+        AutoDrone       = false,
+        AutoShield      = false,
+        AutoSniper      = false,
+        InstantClaim    = false,
+        TargetBrainrots = {},
+        TargetMutation  = "All",
+        AutoShoot       = false,
+        ShootArea       = 10,
+        BrainrotPad     = "All",
+        SniperAmount    = 1,
+        AutoSell        = false,
+        AutoRewards     = false,
+        MoveSpeed       = 300
+    }
+
+    -- Helper: safely resolve dropdown value (fixes "string expected, got table" error)
+    local function resolveDropdown(v, default)
+        if type(v) == "table" then
+            for _, item in pairs(v) do return tostring(item) end
+            return default
+        end
+        return tostring(v)
+    end
+
+    local BrainrotIdMap = {
+        [1]    = "Tung Tung Tung Sahur",
+        [2]    = "StrawberryElephant",
+        [3]    = "Boneca Ambalabu",
+        [4]    = "Bombombini Gusini",
+        [5]    = "John Pork",
+        [6]    = "Ballerina Cappuccina",
+        [7]    = "Brr Brr Patapim",
+        [8]    = "Lirili Larila",
+        [9]    = "Orangutini Ananassini",
+        [10]   = "Cappuccino Assassino",
+        [11]   = "Pakrahmatmamat",
+        [12]   = "Pipi Avocado",
+        [13]   = "Karkerkar Kurkur",
+        [14]   = "Trippi Troppi",
+        [15]   = "67",
+        [16]   = "TimCheese",
+        [17]   = "Los Tung Tung Tung Citos",
+        [18]   = "La Vacca Saturno Saturnita",
+        [19]   = "Mastodontico Telepiedone",
+        [20]   = "Tralalero Tralala",
+        [21]   = "Tralalerita Tralala",
+        [22]   = "Pipi Kiwi",
+        [23]   = "Bananita Dolphinita",
+        [24]   = "FluriFlura",
+        [25]   = "Glorbo Fruttodrillo",
+        [26]   = "Meowl",
+        [27]   = "Odin Din Din Dun",
+        [28]   = "Strawberrelli Flamingelli",
+        [29]   = "Penguino Cocosino",
+        [30]   = "Frigo Camelo",
+        [31]   = "TipiTopiTaco",
+        [32]   = "Cacto Hipopotamo",
+        [33]   = "Matteo",
+        [34]   = "SwagSoda",
+        [35]   = "Tatata Sahur",
+        [36]   = "Chimpanzini Spiderini",
+        [37]   = "Los Bros",
+        [38]   = "Ketupat Kepat",
+        [39]   = "EsokSekolah",
+        [40]   = "Dragon",
+        [41]   = "ChillinChilli",
+        [42]   = "Burguro And Fryuro",
+        [43]   = "CapiTaco",
+        [44]   = "Chimpanzini Bananini",
+        [45]   = "Rhino Toasterino",
+        [46]   = "Ganganzelli Trulala",
+        [47]   = "GaramaAndMadundung",
+        [48]   = "CookiAndMilki",
+        [49]   = "OrcaleroOrcala",
+        [50]   = "Orcalita Orcala",
+        [51]   = "Bisonte Giuppitere",
+        [52]   = "Agarrini La Palini",
+        [53]   = "Antonio",
+        [54]   = "Lavadorito Spinito",
+        [55]   = "Alessio",
+        [56]   = "Bambini Crostini",
+        [57]   = "Zibra Zubra Zibralini",
+        [58]   = "Bandito Axolito",
+        [59]   = "Trenostruzzo Turbo 3000",
+        [60]   = "Los Tralaleritos",
+        [61]   = "Urubini Flamenguini",
+        [62]   = "Carrotini Brainini",
+        [63]   = "Brr es Teh Patipum",
+        [64]   = "Tukanno Bananno",
+        [65]   = "Bombardiro Crocodilo",
+        [66]   = "Tric Trac Baraboom",
+        [67]   = "Bulbito Bandito Traktorito",
+        [68]   = "LosCrocodillitos",
+        [69]   = "Cavallo Virtuoso",
+        [70]   = "Ta Ta Ta Ta Sahur",
+        [71]   = "Burbaloni Loliloli",
+        [72]   = "Te Te Te Sahur",
+        [73]   = "Svinina Bombardino",
+        [74]   = "Brri Brri Bicus Dicus Bombicus",
+        [75]   = "Talpa Di Fero",
+        [76]   = "Cacasito Satalito",
+        [77]   = "Esok Sekolah",
+        [78]   = "Pipi Potato",
+        [79]   = "Chicleteira Bicicleteira",
+        [80]   = "Quivioli Ameleonni",
+        [81]   = "Sigma Boy",
+        [82]   = "Sigma Girl",
+        [83]   = "Dul Dul Dul",
+        [2000] = "Pandaccini Bananini",
+        [2001] = "Cocofanto Elefanto",
+        [3001] = "SneakyTralalaeritos",
+        [3002] = "Spaghetti Tualetti",
+        [3003] = "LosMatteos",
+        [3004] = "Trulimero Trulicina",
+        [3005] = "Tictac Sahur",
+        [3006] = "PotHotspot",
+        [3007] = "Gangster Footera",
+        [4001] = "Avocadini Guffo",
+        [4002] = "Avocadini Antilopini",
+        [4003] = "Avocadorilla",
+        [4004] = "Blackhole Goat",
+        [4005] = "Spioniro Golubiro",
+    }
+
+    local MutationIdMap = {
+        [1] = "normal",
+        [2] = "gold",
+        [3] = "diamond",
+        [4] = "emerald",
+        [5] = "void",
+        [6] = "rainbow"
+    }
+
+    local gal44Cache = nil
+    local function gal45()
+        if gal44Cache and gal44Cache.Parent then return gal44Cache end
+        local GameFolder = workspace:FindFirstChild("GameFolder")
+        gal44Cache = GameFolder and GameFolder:FindFirstChild("BrainrotModels")
+        return gal44Cache
+    end
+
+    local function matchesBrainrotName(model, targetSet)
+        if next(targetSet) == nil then return true end
+        local id = model:GetAttribute("BrainrotId")
+        return targetSet[id] == true
+    end
+
+    local function getMutationType(model)
+        local mutId = model:GetAttribute("BrainrotMutation")
+        return MutationIdMap[mutId] or "normal"
+    end
+
+    local function matchesMutation(model, targetMutation)
+        if targetMutation == "All" then return true end
+        local mType = getMutationType(model)
+        return mType == string.lower(targetMutation)
+    end
+
+    local function gal47()
+        local result = {}
+        local folder = gal45()
+        if folder then
+            for _, child in ipairs(folder:GetChildren()) do
+                if child:IsA("Model") then result[#result + 1] = child end
+            end
+        end
+        if getnilinstances then
+            for _, inst in next, getnilinstances() do
+                if inst.ClassName == "Model" and #inst.Name == 36 then
+                    result[#result + 1] = inst
+                end
+            end
+        end
+        return result
+    end
+
+    local gal48 = CFrame.new(281.00350952148, 268.92413330078, 1600.3850097656,
+        .65544629096985, 1.049571949352e-07, -0.75524175167084,
+        -6.8983716516868e-08, 1, 7.9103237737854e-08,
+        .75524175167084, 2.5145963089557e-10, .65544629096985)
+    local gal49 = Vector3.new(241.53810119629, 178.41264343262, 1225.9730224609)
+
+    local function gal51(result, fallback)
+        if type(result) == "string" then return result end
+        if type(result) == "table" then
+            local uid = result.droneUid or result.DroneUid or result.drone
+                     or result.droneId or result.uid or result.id or result.Drone
+            if type(uid) == "string" then return uid end
+        end
+        return fallback .. "Drone"
+    end
+
+    local function gal52(model)
+        local Name = model.Name
+        pcall(function() gal38:FireServer(Name) end)
+        task.wait(0.03)
+
+        local droneResult = nil
+        for i = 1, 8 do
+            local ok, result = pcall(function()
+                return gal39:InvokeServer({
+                    startPos    = gal48,
+                    endPos      = gal49,
+                    startTick   = tick(),
+                    brainrotUid = Name
+                })
+            end)
+            if ok and result then droneResult = result break end
+            task.wait(0.05)
+        end
+        if not droneResult then return false end
+
+        local droneUid = gal51(droneResult, Name)
+        for i = 1, 4 do
+            local ok = pcall(function() return gal40:InvokeServer(Name, droneUid) end)
+            if ok then
+                pcall(function() gal41:FireServer(droneUid) end)
+                return true
+            end
+            task.wait(0.05)
+        end
+        pcall(function() gal41:FireServer(droneUid) end)
+        return true
+    end
+
+    local function gal55()
+        local result = {}
+        local Backpack = LocalPlayer:FindFirstChild("Backpack")
+        if not Backpack then return result end
+        for _, tool in ipairs(Backpack:GetChildren()) do
+            if #tool.Name == 36 then result[#result + 1] = tool.Name end
+        end
+        return result
+    end
+
+    local function gal57()
+        for i = 1, 100 do pcall(function() gal28:FireServer(i) end) end
+    end
+
+    local function gal59()
+        for i, name in ipairs(gal55()) do
+            pcall(function() gal29:FireServer(name) end)
+            task.wait(0.05)
+        end
+    end
+
+    local gal62 = {}
+    local function gal63()
+        if not gal43.InstantClaim then return end
+        for _, model in ipairs(gal47()) do
+            if not gal62[model.Name] then
+                local passBrainrot = matchesBrainrotName(model, gal43.TargetBrainrots)
+                local passMutation = matchesMutation(model, gal43.TargetMutation)
+                if passBrainrot and passMutation then
+                    gal62[model.Name] = true
+                    task.spawn(function()
+                        pcall(gal52, model)
+                        gal62[model.Name] = nil
+                    end)
+                end
+            end
+        end
+    end
+
+    task.spawn(function()
+        while true do
+            gal63()
+            task.wait(0.1)
+        end
+    end)
+
+    local gal66 = Vector3.new(286.163452, 268.924194, 1600.73145)
+    local gal67 = Vector3.new(281.235748, 280.273834, -347.116089)
+    local gal70 = gal66
+
+    RunService.Stepped:Connect(function()
+        if not gal43.InstantClaim then return end
+        local character = LocalPlayer.Character
+        if not character then return end
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if not gal43.InstantClaim then return end
+        local character = LocalPlayer.Character
+        if not character then return end
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        local dir = gal70 - hrp.Position
+        if dir.Magnitude <= 6 then
+            gal70 = gal70 == gal67 and gal66 or gal67
+            return
+        end
+        hrp.AssemblyLinearVelocity = dir.Unit * gal43.MoveSpeed
+    end)
+
+    task.spawn(function()
+        while true do
+            local GameFolder = workspace:FindFirstChild("GameFolder")
+            if GameFolder then
+                local RunTime = GameFolder:FindFirstChild("RunTime")
+                if RunTime then
+                    for _, child in ipairs(RunTime:GetChildren()) do
+                        pcall(function() child:Destroy() end)
+                    end
+                end
+            end
+            task.wait(0.05)
+        end
+    end)
+
+    local shootPos = CFrame.new(259.96139526367, 268.92416381836, 1611.9671630859)
+        * CFrame.Angles(-2.7736456686966e-08, -0.13395781815052, -3.5503895379208e-09)
+    local shootEndPos = Vector3.new(195.70816040039, 188.75393676758, 1419.8082275391)
+
+    task.spawn(function()
+        while true do
+            if gal43.AutoShoot then
+                pcall(function()
+                    local char = LocalPlayer.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    if not hrp then return end
+                    local BasePart = workspace:FindFirstChild("GameFolder")
+                        and workspace.GameFolder:FindFirstChild("BasePart")
+                    if BasePart then
+                        local areaPart = BasePart:FindFirstChild(tostring(gal43.ShootArea))
+                        if areaPart then
+                            hrp.CFrame = areaPart.CFrame * CFrame.new(0, 100, 0)
+                            task.wait(1)
+                        end
+                    end
+                    local BrainrotModels = workspace:FindFirstChild("GameFolder")
+                        and workspace.GameFolder:FindFirstChild("BrainrotModels")
+                    if not BrainrotModels then return end
+                    for _, brainrot in ipairs(BrainrotModels:GetChildren()) do
+                        if not gal43.AutoShoot then break end
+                        local spaceId = brainrot:GetAttribute("BrainrotSpaceId")
+                        local isDead  = brainrot:GetAttribute("IsDead")
+                        if spaceId == gal43.ShootArea and not isDead then
+                            pcall(function() gal38:FireServer(brainrot.Name) end)
+                            task.wait(0.3)
+                            local hrp2 = LocalPlayer.Character
+                                and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                            if hrp2 then hrp2.CFrame = workspace.SpawnLocation.CFrame end
+                            task.wait(0.3)
+                            local droneUid = brainrot.Name .. "Drone"
+                            pcall(function()
+                                gal39:InvokeServer({
+                                    startTick   = tick(),
+                                    endPos      = shootEndPos,
+                                    brainrotUid = brainrot.Name,
+                                    startPos    = shootPos
+                                })
+                            end)
+                            task.wait(0.2)
+                            pcall(function() gal40:InvokeServer(brainrot.Name, droneUid) end)
+                            task.wait(0.2)
+                            pcall(function() gal41:FireServer(droneUid) end)
+                            task.wait(0.3)
+                        end
+                    end
+                end)
+            end
+            task.wait(0.5)
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            for i = 1, 100 do
+                while not gal43.AutoCash do task.wait(0.5) end
+                pcall(function() gal27:FireServer(i) end)
+            end
+            task.wait(0.5)
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            for i = 1, 112 do
+                while not gal43.AutoUpgradeBase do task.wait(0.5) end
+                pcall(function() gal28:FireServer(i) end)
+                task.wait(0.05)
+            end
+            task.wait(0.5)
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            if gal43.AutoBrainrot then
+                if gal43.BrainrotPad == "All" then
+                    for i = 1, 100 do
+                        if not gal43.AutoBrainrot then break end
+                        pcall(function() gal29:FireServer(i) end)
+                        task.wait(0.05)
+                    end
+                else
+                    local pad = tonumber(gal43.BrainrotPad)
+                    if pad then pcall(function() gal29:FireServer(pad) end) end
+                end
+            end
+            task.wait(0.5)
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            if gal43.AutoRebirth then pcall(function() gal30:FireServer() end) end
+            task.wait(0.5)
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            if gal43.AutoDrone then pcall(function() gal31:FireServer(1) end) end
+            task.wait(0.5)
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            if gal43.AutoShield then pcall(function() gal32:FireServer(1) end) end
+            task.wait(0.5)
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            if gal43.AutoSniper then
+                local ShotLevelUp = Net:FindFirstChild("RE/ShotLevelUp")
+                if ShotLevelUp then
+                    pcall(function() ShotLevelUp:FireServer(gal43.SniperAmount) end)
+                end
+            end
+            task.wait(0.5)
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            if gal43.AutoSell then pcall(function() gal36:FireServer() end) end
+            task.wait(0.5)
+        end
+    end)
+
+    task.spawn(function()
+        while true do
+            for i = 1, 9 do
+                while not gal43.AutoRewards do task.wait(1) end
+                pcall(function() gal37:InvokeServer(i) end)
+            end
+            task.wait(1)
+        end
+    end)
+
+    -- ========================
+    -- GUI
+    -- ========================
+    local Lib = loadstring(game:HttpGet("https://pastefy.app/TaC9quOO/raw"))()
+
+    -- Patch: library ini punya bug assign table ke TextLabel.Text
+    -- Override __newindex untuk semua TextLabel agar auto-convert ke string
+    local origNewIndex = getrawmetatable and getrawmetatable(Instance.new("TextLabel")).__newindex
+    if origNewIndex then
+        local mt = getrawmetatable(Instance.new("TextLabel"))
+        local old = mt.__newindex
+        setreadonly(mt, false)
+        mt.__newindex = function(self, key, value)
+            if key == "Text" and type(value) == "table" then
+                local str = ""
+                for k, v in pairs(value) do
+                    if type(v) == "string" then str = v break end
+                    if type(k) == "string" then str = k break end
+                end
+                return old(self, key, str)
+            end
+            return old(self, key, value)
+        end
+        setreadonly(mt, true)
+    end
+
+    local Window = Lib:CreateWindow({
+        ["Title"]              = "Brainrot Sniper",
+        ["Icon"]               = "crown",
+        ["Author"]             = "Rilzz",
+        ["Folder"]             = "BrainrotSniper",
+        ["Size"]               = UDim2.fromOffset(528, 334),
+        ["FileSaveName"]       = "BrainrotSniper/Config.json"
+    })
+
+    local idOrder = {
+        1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,
+        21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
+        41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,
+        61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,
+        81,82,83,2000,2001,3001,3002,3003,3004,3005,3006,3007,
+        4001,4002,4003,4004,4005
+    }
+
+    local BrainrotDisplayList = {}
+    local BrainrotNameToId = {}
+    for _, id in ipairs(idOrder) do
+        if BrainrotIdMap[id] then
+            local name = BrainrotIdMap[id]
+            BrainrotDisplayList[#BrainrotDisplayList + 1] = name
+            BrainrotNameToId[name] = id
+        end
+    end
+
+    local MutasiList = {"All"}
+    for i = 1, 6 do
+        local name = MutationIdMap[i]
+        if name and type(name) == "string" then
+            MutasiList[#MutasiList + 1] = name:sub(1,1):upper() .. name:sub(2)
+        end
+    end
+
+    local PadOptions = {"All"}
+    for i = 1, 100 do PadOptions[#PadOptions + 1] = tostring(i) end
+
+    -- TAB MAIN
+    local TabMain = Window:Tab({
+        ["Title"] = "Main",
+        ["Icon"]  = "home"
+    })
+
+    TabMain:Paragraph({
+        ["Title"]       = "Brainrot Instant",
+        ["Description"] = "Pengaturan auto-claim brainrot"
+    })
+
+    TabMain:Toggle({
+        ["Title"]       = "Auto Get Brainrot Instant",
+        ["Description"] = "Otomatis ambil brainrot sesuai filter",
+        ["Default"]     = false,
+        ["Callback"]    = function(Value)
+            gal43.InstantClaim = Value
+            if not Value then
+                local char = LocalPlayer.Character
+                if char then
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    if hrp then hrp.AssemblyLinearVelocity = Vector3.zero end
+                end
+            end
+        end
+    })
+
+    TabMain:Dropdown({
+        ["Title"]    = "Pilih Brainrot (Multi)",
+        ["Values"]   = BrainrotDisplayList,
+        ["Multi"]    = true,
+        ["Callback"] = function(val)
+            gal43.TargetBrainrots = {}
+            local function addEntry(v)
+                local id = BrainrotNameToId[tostring(v)]
+                if id then gal43.TargetBrainrots[id] = true end
+            end
+            if type(val) == "table" then
+                for _, v in pairs(val) do addEntry(v) end
+            else
+                addEntry(val)
+            end
+        end
+    })
+
+    TabMain:Dropdown({
+        ["Title"]    = "Pilih Mutasi",
+        ["Values"]   = MutasiList,
+        ["Default"]  = MutasiList[1],
+        ["Callback"] = function(v)
+            local val
+            if type(v) == "table" then
+                local first = next(v)
+                val = first and tostring(first) or "All"
+                -- juga coba ambil value dari pasangan key-value
+                for k, vv in pairs(v) do
+                    if type(vv) == "string" then val = vv break end
+                    if type(k) == "string" then val = k break end
+                end
+            else
+                val = tostring(v or "All")
+            end
+            gal43.TargetMutation = val
+        end
+    })
+
+    TabMain:Input({
+        ["Title"]       = "Glide Speed",
+        ["Description"] = "Kecepatan terbang (100-1500), default 300",
+        ["Default"]     = "300",
+        ["Numeric"]     = true,
+        ["Finished"]    = true,
+        ["Callback"]    = function(Value)
+            local n = tonumber(Value)
+            if n then gal43.MoveSpeed = math.clamp(n, 100, 1500) end
+        end
+    })
+
+    TabMain:Paragraph({
+        ["Title"]       = "Auto Shoot",
+        ["Description"] = "Auto shoot brainrot di area tertentu"
+    })
+
+    TabMain:Toggle({
+        ["Title"]    = "Auto Shoot",
+        ["Default"]  = false,
+        ["Callback"] = function(Value) gal43.AutoShoot = Value end
+    })
+
+    TabMain:Dropdown({
+        ["Title"]    = "Area Shoot",
+        ["Values"]   = {"10","11","12"},
+        ["Default"]  = "10",
+        ["Callback"] = function(v)
+            gal43.ShootArea = tonumber(resolveDropdown(v, "10")) or 10
+        end
+    })
+
+    TabMain:Paragraph({
+        ["Title"]       = "Farm",
+        ["Description"] = "Auto farm cash, rebirth, sell, rewards"
+    })
+
+    TabMain:Toggle({
+        ["Title"] = "Auto Cash", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoCash = Value end
+    })
+    TabMain:Toggle({
+        ["Title"] = "Auto Rebirth", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoRebirth = Value end
+    })
+    TabMain:Toggle({
+        ["Title"] = "Auto Sell", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoSell = Value end
+    })
+    TabMain:Toggle({
+        ["Title"] = "Auto Claim Rewards", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoRewards = Value end
+    })
+
+    -- TAB UPGRADES
+    local TabUpgrade = Window:Tab({
+        ["Title"] = "Upgrades",
+        ["Icon"]  = "zap"
+    })
+
+    TabUpgrade:Paragraph({
+        ["Title"]       = "Upgrades",
+        ["Description"] = "Auto upgrade base, brainrot, sniper, drone, shield"
+    })
+
+    TabUpgrade:Toggle({
+        ["Title"] = "Auto Upgrade Base", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoUpgradeBase = Value end
+    })
+
+    TabUpgrade:Toggle({
+        ["Title"] = "Auto Upgrade Brainrot", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoBrainrot = Value end
+    })
+
+    TabUpgrade:Dropdown({
+        ["Title"]    = "Brainrot Pad",
+        ["Values"]   = PadOptions,
+        ["Default"]  = "All",
+        ["Callback"] = function(v)
+            gal43.BrainrotPad = resolveDropdown(v, "All")
+        end
+    })
+
+    TabUpgrade:Toggle({
+        ["Title"] = "Auto Upgrade Sniper", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoSniper = Value end
+    })
+
+    TabUpgrade:Dropdown({
+        ["Title"]    = "Sniper Amount",
+        ["Values"]   = {"1","5","10"},
+        ["Default"]  = "1",
+        ["Callback"] = function(v)
+            gal43.SniperAmount = tonumber(resolveDropdown(v, "1")) or 1
+        end
+    })
+
+    TabUpgrade:Toggle({
+        ["Title"] = "Auto Buy Drone", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoDrone = Value end
+    })
+    TabUpgrade:Toggle({
+        ["Title"] = "Auto Buy Shield", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoShield = Value end
+    })
+
+    -- TAB PLACE
+    local TabPlace = Window:Tab({
+        ["Title"] = "Place",
+        ["Icon"]  = "target"
+    })
+
+    TabPlace:Paragraph({
+        ["Title"]       = "Actions",
+        ["Description"] = "Aksi manual placement"
+    })
+
+    TabPlace:Button({
+        ["Title"]    = "Place Once",
+        ["Callback"] = function() gal59() end
+    })
+    TabPlace:Button({
+        ["Title"]    = "Unequip All",
+        ["Callback"] = function() gal57() end
+    })
+
+    -- TAB SETTINGS
+    local TabSettings = Window:Tab({
+        ["Title"] = "Settings",
+        ["Icon"]  = "settings"
+    })
+
+    TabSettings:Paragraph({
+        ["Title"]       = "About",
+        ["Description"] = "Brainrot Sniper • by RilzzHub"
+    })
+
+    TabSettings:Button({
+        ["Title"]    = "Unload",
+        ["Callback"] = function()
+            pcall(function() Window:Destroy() end)
+        end
+    })
+
+    pcall(function()
+        Window:Notify({
+            ["Title"]    = "Brainrot Sniper",
+            ["Content"]  = "Script berhasil dimuat!",
+            ["Duration"] = 5
+        })
+    end)
+end
