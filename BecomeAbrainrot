@@ -1,0 +1,147 @@
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/liebertsx/Tora-Library/main/src/librarynew", true))()
+
+local TweenService      = game:GetService("TweenService")
+local Players           = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Player = Players.LocalPlayer
+
+local AutoFuse    = false
+local AutoCollect = false
+local AutoRebirth = false
+
+-- ========================
+-- COLLECT CASH (stand 1-40)
+-- ========================
+local function doCollect()
+    local AnimalStands = Player:FindFirstChild("AnimalStands")
+    if not AnimalStands then return end
+    local CollectCash = ReplicatedStorage:FindFirstChild("Events")
+        and ReplicatedStorage.Events:FindFirstChild("CollectCash")
+    if not CollectCash then return end
+    for i = 1, 40 do
+        if not AutoCollect then break end
+        local stand = AnimalStands:FindFirstChild(tostring(i))
+        if stand then
+            pcall(function() CollectCash:FireServer(stand) end)
+        end
+        task.wait(0.05)
+    end
+end
+
+-- ========================
+-- FUSE
+-- ========================
+local function doFuse()
+    local Character = Player.Character or Player.CharacterAdded:Wait()
+    local HRP       = Character:WaitForChild("HumanoidRootPart")
+    local Humanoid  = Character:WaitForChild("Humanoid")
+
+    local ok = pcall(function()
+        local Part = workspace.Map.FuseMachine.AddPrompt.ProximityPrompt.Parent
+        local Tween = TweenService:Create(
+            HRP,
+            TweenInfo.new(2, Enum.EasingStyle.Linear),
+            { CFrame = Part.CFrame + Vector3.new(0, 0, -3) }
+        )
+        Tween:Play()
+        Tween.Completed:Wait()
+    end)
+    if not ok then return end
+
+    local Tool = Player.Backpack:GetChildren()[1]
+    if Tool and Tool:IsA("Tool") then
+        Humanoid:EquipTool(Tool)
+    end
+    task.wait(0.2)
+    Character:BreakJoints()
+    task.wait(1)
+
+    local NewCharacter = Player.Character or Player.CharacterAdded:Wait()
+    local NewHRP       = NewCharacter:WaitForChild("HumanoidRootPart")
+    local NearestPrompt, NearestDistance = nil, math.huge
+
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("ProximityPrompt")
+            and (v.ActionText == "Insert Brainrot" or v.ObjectText == "Insert Brainrot") then
+            local p = v.Parent
+            if p and p:IsA("BasePart") then
+                local d = (NewHRP.Position - p.Position).Magnitude
+                if d < NearestDistance then
+                    NearestDistance = d
+                    NearestPrompt   = v
+                end
+            end
+        end
+    end
+
+    if NearestPrompt then
+        pcall(function() fireproximityprompt(NearestPrompt) end)
+        task.wait(0.1)
+        pcall(function()
+            ReplicatedStorage:WaitForChild("Events")
+                :WaitForChild("FuseRetrieve"):FireServer(1)
+        end)
+    end
+end
+
+-- ========================
+-- LOOPS
+-- ========================
+task.spawn(function()
+    while true do
+        if AutoFuse then pcall(doFuse) end
+        task.wait()
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if AutoCollect then pcall(doCollect) end
+        task.wait()
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if AutoRebirth then
+            pcall(function()
+                ReplicatedStorage:WaitForChild("Events")
+                    :WaitForChild("Rebirth"):FireServer()
+            end)
+        end
+        task.wait(3)
+    end
+end)
+
+-- ========================
+-- GUI — TORA LIBRARY
+-- ========================
+local tab    = library:CreateWindow("Become A Brainrot")
+local folder = tab:AddFolder("Main")
+
+folder:AddToggle({
+    text     = "Auto Dupe",
+    flag     = "auto_fuse",
+    callback = function(v)
+        AutoFuse = v
+    end
+})
+
+folder:AddToggle({
+    text     = "Auto Collect Cash",
+    flag     = "auto_collect",
+    callback = function(v)
+        AutoCollect = v
+    end
+})
+
+folder:AddToggle({
+    text     = "Auto Rebirth",
+    flag     = "auto_rebirth",
+    callback = function(v)
+        AutoRebirth = v
+    end
+})
+
+library:Init()
