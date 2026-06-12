@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Player = Players.LocalPlayer
 
 local AutoFuse    = false
+local AutoFuse2   = false
 local AutoCollect = false
 local AutoRebirth = false
 
@@ -30,7 +31,23 @@ local function doCollect()
 end
 
 -- ========================
--- FUSE
+-- HELPER
+-- ========================
+local function getValidTool(bag)
+    for _, t in ipairs(bag:GetChildren()) do
+        if t:IsA("Tool") then
+            local tip = (t.ToolTip or ""):lower()
+            local nm  = t.Name:lower()
+            if not string.find(tip, "treadmill") and not string.find(nm, "treadmill") then
+                return t
+            end
+        end
+    end
+    return nil
+end
+
+-- ========================
+-- FUSE (FuseMachine)
 -- ========================
 local function doFuse()
     local Character = Player.Character or Player.CharacterAdded:Wait()
@@ -39,28 +56,35 @@ local function doFuse()
 
     local ok = pcall(function()
         local Part = workspace.Map.FuseMachine.AddPrompt.ProximityPrompt.Parent
-        local Tween = TweenService:Create(
-            HRP,
-            TweenInfo.new(2, Enum.EasingStyle.Linear),
-            { CFrame = Part.CFrame + Vector3.new(0, 0, -3) }
-        )
-        Tween:Play()
-        Tween.Completed:Wait()
+        HRP.CFrame = Part.CFrame + Vector3.new(0, 0, -3)
     end)
     if not ok then return end
+    task.wait(0.1)
 
-    local Tool = Player.Backpack:GetChildren()[1]
-    if Tool and Tool:IsA("Tool") then
+    local Tool = getValidTool(Player.Backpack)
+    if Tool then
         Humanoid:EquipTool(Tool)
+        task.wait(0.2)
     end
-    task.wait(0.2)
+
+    local FuseRetrieve = ReplicatedStorage:WaitForChild("Events"):WaitForChild("FuseRetrieve")
+    for i = 1, 4 do
+        pcall(function()
+            local args = { i }
+            FuseRetrieve:FireServer(unpack(args))
+        end)
+        task.wait(0.05)
+    end
+
+    task.wait(0.1)
     Character:BreakJoints()
     task.wait(1)
 
     local NewCharacter = Player.Character or Player.CharacterAdded:Wait()
     local NewHRP       = NewCharacter:WaitForChild("HumanoidRootPart")
-    local NearestPrompt, NearestDistance = nil, math.huge
+    local NewHumanoid  = NewCharacter:WaitForChild("Humanoid")
 
+    local NearestPrompt, NearestDistance = nil, math.huge
     for _, v in ipairs(workspace:GetDescendants()) do
         if v:IsA("ProximityPrompt")
             and (v.ActionText == "Insert Brainrot" or v.ObjectText == "Insert Brainrot") then
@@ -76,13 +100,104 @@ local function doFuse()
     end
 
     if NearestPrompt then
-        pcall(function() fireproximityprompt(NearestPrompt) end)
-        task.wait(0.1)
-        pcall(function()
-            ReplicatedStorage:WaitForChild("Events")
-                :WaitForChild("FuseRetrieve"):FireServer(1)
-        end)
+        local tf = tick()
+        while tick() - tf < 5 do
+            if not AutoFuse then break end
+            local t = getValidTool(Player.Backpack)
+            if t then
+                pcall(function() NewHumanoid:EquipTool(t) end)
+                task.wait(0.1)
+            end
+            pcall(function() fireproximityprompt(NearestPrompt) end)
+            task.wait(0.2)
+        end
     end
+
+    pcall(function()
+        local char = Player.Character or Player.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+        hrp.CFrame = CFrame.new(Vector3.new(48.1, 4.2, -7.5))
+    end)
+end
+
+-- ========================
+-- FUSE V2 (WeatherMachine)
+-- ========================
+local function doFuse2()
+    local Character = Player.Character or Player.CharacterAdded:Wait()
+    local HRP       = Character:WaitForChild("HumanoidRootPart")
+    local Humanoid  = Character:WaitForChild("Humanoid")
+
+    local ok = pcall(function()
+        local Part = workspace.Map.WeatherMachine.AddPrompt.ProximityPrompt.Parent
+        HRP.CFrame = Part.CFrame + Vector3.new(0, 0, -3)
+    end)
+    if not ok then return end
+    task.wait(0.1)
+
+    local Tool = getValidTool(Player.Backpack)
+    if Tool then
+        Humanoid:EquipTool(Tool)
+        task.wait(0.2)
+    end
+
+    local WeatherRetrieve = ReplicatedStorage:WaitForChild("Events"):WaitForChild("WeatherMachineRetrieve")
+    for i = 1, 4 do
+        pcall(function()
+            local args = { i }
+            WeatherRetrieve:FireServer(unpack(args))
+        end)
+        task.wait(0.05)
+    end
+
+    task.wait(0.2)
+    Character:BreakJoints()
+    task.wait(1)
+
+    local NewCharacter = Player.Character or Player.CharacterAdded:Wait()
+    local NewHRP       = NewCharacter:WaitForChild("HumanoidRootPart")
+    local NewHumanoid  = NewCharacter:WaitForChild("Humanoid")
+
+    local NearestPrompt = getNearestPrompt(NewHRP)
+
+    if NearestPrompt then
+        local tf = tick()
+        while tick() - tf < 5 do
+            if not AutoFuse2 then break end
+            local t = getValidTool(Player.Backpack)
+            if t then
+                pcall(function() NewHumanoid:EquipTool(t) end)
+                task.wait(0.1)
+            end
+            pcall(function() fireproximityprompt(NearestPrompt) end)
+            task.wait(0.2)
+        end
+    end
+
+    pcall(function()
+        local char = Player.Character or Player.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+        hrp.CFrame = CFrame.new(Vector3.new(48.1, 4.2, -7.5))
+    end)
+end
+
+-- ========================
+-- FUSE V2 HELPER: cari prompt terdekat tanpa filter
+local function getNearestPrompt(hrp)
+    local nearest, nearestDist = nil, math.huge
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("ProximityPrompt") then
+            local p = v.Parent
+            if p and p:IsA("BasePart") then
+                local d = (hrp.Position - p.Position).Magnitude
+                if d < nearestDist then
+                    nearestDist = d
+                    nearest     = v
+                end
+            end
+        end
+    end
+    return nearest
 end
 
 -- ========================
@@ -132,6 +247,13 @@ end)
 
 task.spawn(function()
     while true do
+        if AutoFuse2 then pcall(doFuse2) end
+        task.wait()
+    end
+end)
+
+task.spawn(function()
+    while true do
         if AutoCollect then pcall(doCollect) end
         task.wait()
     end
@@ -158,54 +280,45 @@ local folder = tab:AddFolder("Main")
 folder:AddToggle({
     text     = "Auto Dupe",
     flag     = "auto_fuse",
-    callback = function(v)
-        AutoFuse = v
-    end
+    callback = function(v) AutoFuse = v end
+})
+
+folder:AddToggle({
+    text     = "Auto Dupe V2",
+    flag     = "auto_fuse2",
+    callback = function(v) AutoFuse2 = v end
 })
 
 folder:AddToggle({
     text     = "Auto Collect Cash",
     flag     = "auto_collect",
-    callback = function(v)
-        AutoCollect = v
-    end
+    callback = function(v) AutoCollect = v end
 })
 
 folder:AddToggle({
     text     = "Auto Rebirth",
     flag     = "auto_rebirth",
-    callback = function(v)
-        AutoRebirth = v
-    end
+    callback = function(v) AutoRebirth = v end
 })
 
--- ========================
--- GUI — NEW FEATURES
--- ========================
 local folder2 = tab:AddFolder("Utilities")
 
 folder2:AddButton({
     text     = "Summon Brainrot",
     flag     = "summon_brainrot",
-    callback = function()
-        doSummonBrainrot()
-    end
+    callback = function() doSummonBrainrot() end
 })
 
 folder2:AddButton({
     text     = "Tp Best Area",
     flag     = "tp_best_area",
-    callback = function()
-        doTpBestArea()
-    end
+    callback = function() doTpBestArea() end
 })
 
 folder2:AddButton({
     text     = "Tp Spawn",
     flag     = "tp_spawn",
-    callback = function()
-        doTpSpawn()
-    end
+    callback = function() doTpSpawn() end
 })
 
 library:Init()
