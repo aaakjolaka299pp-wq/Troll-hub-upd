@@ -1,0 +1,130 @@
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+
+-- Load Library
+local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/liebertsx/Tora-Library/main/src/librarynew"))()
+
+-- GUI
+local window = library:CreateWindow("Rilz Hub")
+
+-- FITUR TAMBAHAN (AsierScripts - Button)
+window:AddButton({
+    text = "Dupe",
+    callback = function()
+        local plr = game.Players.LocalPlayer
+        if plr.Character and plr.Character:FindFirstChild("Humanoid") then
+            plr.Character.Humanoid.Health = 0
+        end
+
+        task.wait(1)
+
+        game:GetService("ReplicatedStorage")
+            :WaitForChild("Remotes")
+            :WaitForChild("PlaceBest")
+            :FireServer()
+    end
+})
+
+-- FITUR UTAMA
+local autoBestArea = window:AddToggle({
+    text = "Auto Best Area",
+    state = false,
+    callback = function(state) end
+})
+
+local autoRebirth = window:AddToggle({
+    text = "Auto Rebirth",
+    state = false,
+    callback = function(state) end
+})
+
+library:Init()
+
+-- Fungsi collect brainrot
+function collectNearest()
+    hrp.CFrame = CFrame.new(-20.8, 6.2, -3981.8)
+    task.wait(1)
+
+    local nearestPrompt = nil
+    local nearestPos = nil
+    local nearestDistance = math.huge
+
+    local spawnedBrainrots = workspace:FindFirstChild("SpawnedBrainrots")
+
+    if spawnedBrainrots then
+        for _, brainrot in ipairs(spawnedBrainrots:GetChildren()) do
+            local hitbox = brainrot:FindFirstChild("PickupHitbox")
+            if hitbox then
+                local prompt = hitbox:FindFirstChildOfClass("ProximityPrompt")
+                if prompt then
+                    local pos = hitbox.Position
+                    local dist = (hrp.Position - pos).Magnitude
+
+                    if dist < nearestDistance then
+                        nearestDistance = dist
+                        nearestPrompt = prompt
+                        nearestPos = pos
+                    end
+                end
+            end
+        end
+    end
+
+    if nearestPrompt and nearestPos then
+        local distance = (hrp.Position - nearestPos).Magnitude
+
+        if distance > 0.5 then
+            local direction = (hrp.Position - nearestPos).Unit
+            local targetCFrame = CFrame.new(nearestPos + direction * 3)
+            local tweenTime = math.max(distance / 50, 0.1)
+
+            local tween = TweenService:Create(
+                hrp,
+                TweenInfo.new(tweenTime, Enum.EasingStyle.Linear),
+                {CFrame = targetCFrame}
+            )
+
+            tween:Play()
+            tween.Completed:Wait()
+        end
+
+        nearestPrompt.MaxActivationDistance = 1000
+        task.wait(0.1)
+        fireproximityprompt(nearestPrompt)
+
+        task.wait(0.5)
+        hrp.CFrame = CFrame.new(1.2, 6.4, -245.4)
+        task.wait(3)
+    end
+end
+
+-- Loop Auto Best Area
+task.spawn(function()
+    while task.wait(0.1) do
+        if autoBestArea.state then
+            collectNearest()
+        end
+    end
+end)
+
+-- Loop Auto Rebirth
+task.spawn(function()
+    while task.wait(5) do
+        if autoRebirth.state then
+            pcall(function()
+                ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("RequestRebirth"):FireServer()
+            end)
+        end
+    end
+end)
+
+-- Re-get char saat respawn
+player.CharacterAdded:Connect(function(newChar)
+    char = newChar
+    hrp = newChar:WaitForChild("HumanoidRootPart")
+end)
