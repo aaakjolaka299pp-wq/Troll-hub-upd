@@ -224,13 +224,15 @@ end
 local btnInfo, lblInfo, barInfo = makeTab("Information", 12)
 local btnMain, lblMain, barMain = makeTab("Main Hub",    53)
 local btnDupe, lblDupe, barDupe = makeTab("Dupe",        94)
-local btnUtil, lblUtil, barUtil = makeTab("Utilities",   135)
-local btnExpl, lblExpl, barExpl = makeTab("Exploit",    176)
-local btnLive, lblLive, barLive = makeTab("Live Scan",  217)
+local btnTrd,  lblTrd,  barTrd  = makeTab("Auto TRD",   135)
+local btnUtil, lblUtil, barUtil = makeTab("Utilities",   176)
+local btnExpl, lblExpl, barExpl = makeTab("Exploit",    217)
+local btnLive, lblLive, barLive = makeTab("Live Scan",  258)
 
 tabs["Information"] = {btn=btnInfo, lbl=lblInfo, bar=barInfo}
 tabs["Main Hub"]    = {btn=btnMain, lbl=lblMain, bar=barMain}
 tabs["Dupe"]        = {btn=btnDupe, lbl=lblDupe, bar=barDupe}
+tabs["Auto TRD"]    = {btn=btnTrd,  lbl=lblTrd,  bar=barTrd}
 tabs["Utilities"]   = {btn=btnUtil, lbl=lblUtil, bar=barUtil}
 tabs["Exploit"]     = {btn=btnExpl, lbl=lblExpl, bar=barExpl}
 tabs["Live Scan"]   = {btn=btnLive, lbl=lblLive, bar=barLive}
@@ -401,58 +403,74 @@ local function doFuse()
 
     local FuseRetrieve = ReplicatedStorage:WaitForChild("Events"):WaitForChild("FuseRetrieve")
     for i = 1, 4 do
-        pcall(function() FuseRetrieve:FireServer(i) end)
+        pcall(function()
+            FuseRetrieve:FireServer(i)
+        end)
         task.wait(0.05)
     end
 
     task.wait(0.1)
     Character:BreakJoints()
+    task.wait(1)
 
-    -- Tunggu karakter baru
-    local NewCharacter = LocalPlayer.Character
-    if not NewCharacter or NewCharacter == Character then
-        local done = false
-        local conn
-        conn = LocalPlayer.CharacterAdded:Connect(function(c)
-            NewCharacter = c
-            done = true
-            conn:Disconnect()
-        end)
-        local t0 = tick()
-        while not done do
-            if not State.AutoFuse then conn:Disconnect() return end
-            if tick() - t0 > 10 then conn:Disconnect() return end
-            task.wait(0.05)
+    local NewCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local NewHRP       = NewCharacter:WaitForChild("HumanoidRootPart")
+    local NewHumanoid  = NewCharacter:WaitForChild("Humanoid")
+
+    local NearestPrompt, NearestDistance = nil, math.huge
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("ProximityPrompt")
+            and (v.ActionText == "Insert Brainrot" or v.ObjectText == "Insert Brainrot") then
+            local p = v.Parent
+            if p and p:IsA("BasePart") then
+                local d = (NewHRP.Position - p.Position).Magnitude
+                if d < NearestDistance then
+                    NearestDistance = d
+                    NearestPrompt   = v
+                end
+            end
         end
     end
 
-    local NewHRP      = NewCharacter:WaitForChild("HumanoidRootPart")
-    local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
-
-    -- Tunggu fully loaded
-    local h0 = tick()
-    while NewHumanoid.Health <= 0 do
-        if not State.AutoFuse then return end
-        if tick() - h0 > 5 then return end
-        task.wait(0.05)
+    if NearestPrompt then
+        local tf = tick()
+        while tick() - tf < 5 do
+            if not State.AutoFuse then break end
+            local t = getValidTool(LocalPlayer.Backpack)
+            if t then
+                pcall(function() NewHumanoid:EquipTool(t) end)
+                task.wait(0.1)
+            end
+            pcall(function() fireproximityprompt(NearestPrompt) end)
+            task.wait(0.2)
+        end
     end
 
-    if not State.AutoFuse then return end
-
-    local NearestPrompt = getNearestInsertPrompt(NewHRP)
-    if not NearestPrompt then return end
-
-    local t = getValidTool(LocalPlayer.Backpack)
-    if t then pcall(function() NewHumanoid:EquipTool(t) end) end
-    pcall(function() fireproximityprompt(NearestPrompt) end)
-
-    local FuseRetrieve2 = ReplicatedStorage:WaitForChild("Events"):WaitForChild("FuseRetrieve")
-    for i = 1, 4 do
-        pcall(function() FuseRetrieve2:FireServer(i) end)
-    end
+    pcall(function()
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+        hrp.CFrame = CFrame.new(Vector3.new(48.1, 4.2, -7.5))
+    end)
 end
 
 -- FUSE V2 (WeatherMachine)
+local function getNearestPrompt(hrp)
+    local nearest, nearestDist = nil, math.huge
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("ProximityPrompt") then
+            local p = v.Parent
+            if p and p:IsA("BasePart") then
+                local d = (hrp.Position - p.Position).Magnitude
+                if d < nearestDist then
+                    nearestDist = d
+                    nearest     = v
+                end
+            end
+        end
+    end
+    return nearest
+end
+
 local function doFuse2()
     local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local HRP       = Character:WaitForChild("HumanoidRootPart")
@@ -473,53 +491,41 @@ local function doFuse2()
 
     local WeatherRetrieve = ReplicatedStorage:WaitForChild("Events"):WaitForChild("WeatherMachineRetrieve")
     for i = 1, 4 do
-        pcall(function() WeatherRetrieve:FireServer(i) end)
+        pcall(function()
+            WeatherRetrieve:FireServer(i)
+        end)
         task.wait(0.05)
     end
 
-    task.wait(0.1)
+    task.wait(0.2)
     Character:BreakJoints()
+    task.wait(1)
 
-    local NewCharacter = LocalPlayer.Character
-    if not NewCharacter or NewCharacter == Character then
-        local done = false
-        local conn
-        conn = LocalPlayer.CharacterAdded:Connect(function(c)
-            NewCharacter = c
-            done = true
-            conn:Disconnect()
-        end)
-        local t0 = tick()
-        while not done do
-            if not State.AutoFuse2 then conn:Disconnect() return end
-            if tick() - t0 > 10 then conn:Disconnect() return end
-            task.wait(0.05)
+    local NewCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local NewHRP       = NewCharacter:WaitForChild("HumanoidRootPart")
+    local NewHumanoid  = NewCharacter:WaitForChild("Humanoid")
+
+    local NearestPrompt = getNearestPrompt(NewHRP)
+
+    if NearestPrompt then
+        local tf = tick()
+        while tick() - tf < 5 do
+            if not State.AutoFuse2 then break end
+            local t = getValidTool(LocalPlayer.Backpack)
+            if t then
+                pcall(function() NewHumanoid:EquipTool(t) end)
+                task.wait(0.1)
+            end
+            pcall(function() fireproximityprompt(NearestPrompt) end)
+            task.wait(0.2)
         end
     end
 
-    local NewHRP      = NewCharacter:WaitForChild("HumanoidRootPart")
-    local NewHumanoid = NewCharacter:WaitForChild("Humanoid")
-
-    local h0 = tick()
-    while NewHumanoid.Health <= 0 do
-        if not State.AutoFuse2 then return end
-        if tick() - h0 > 5 then return end
-        task.wait(0.05)
-    end
-
-    if not State.AutoFuse2 then return end
-
-    local NearestPrompt = getNearestInsertPrompt(NewHRP)
-    if not NearestPrompt then return end
-
-    local t = getValidTool(LocalPlayer.Backpack)
-    if t then pcall(function() NewHumanoid:EquipTool(t) end) end
-    pcall(function() fireproximityprompt(NearestPrompt) end)
-
-    local WeatherRetrieve2 = ReplicatedStorage:WaitForChild("Events"):WaitForChild("WeatherMachineRetrieve")
-    for i = 1, 4 do
-        pcall(function() WeatherRetrieve2:FireServer(i) end)
-    end
+    pcall(function()
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+        hrp.CFrame = CFrame.new(Vector3.new(48.1, 4.2, -7.5))
+    end)
 end
 
 -- SUMMON
@@ -715,6 +721,304 @@ dupeDisc.ZIndex = 4
 makeButton(ContentDupe, "Dupe Manual", "Respawn", 205, function()
     local char = LocalPlayer.Character
     if char then char:BreakJoints() end
+end)
+
+-- ========================
+-- CONTENT: AUTO TRD
+-- ========================
+local ContentTrd = Instance.new("Frame")
+ContentTrd.Size = UDim2.new(1, -20, 1, -20)
+ContentTrd.Position = UDim2.new(0, 10, 0, 10)
+ContentTrd.BackgroundTransparency = 1
+ContentTrd.Visible = false
+ContentTrd.ZIndex = 3
+ContentTrd.Parent = RightPanel
+contents["Auto TRD"] = ContentTrd
+
+local trdTitle = Instance.new("TextLabel", ContentTrd)
+trdTitle.Size = UDim2.new(1, -20, 0, 30)
+trdTitle.Position = UDim2.new(0, 15, 0, 5)
+trdTitle.Text = "< /> AUTO TRD"
+trdTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+trdTitle.Font = Enum.Font.GothamBold
+trdTitle.TextSize = 12
+trdTitle.TextXAlignment = Enum.TextXAlignment.Left
+trdTitle.BackgroundTransparency = 1
+trdTitle.ZIndex = 4
+
+local TrdState = {
+    selectedPlayer = nil,
+    selectedCount  = "Any",
+}
+local trdRunning = false
+
+-- ========================
+-- SELECTOR PLAYER (prev/next)
+-- ========================
+local playerContainer = Instance.new("Frame", ContentTrd)
+playerContainer.Size = UDim2.new(1, -30, 0, 46)
+playerContainer.Position = UDim2.new(0, 15, 0, 40)
+playerContainer.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+playerContainer.BackgroundTransparency = 0.4
+playerContainer.ZIndex = 4
+Instance.new("UICorner", playerContainer).CornerRadius = UDim.new(0, 10)
+
+local playerLbl = Instance.new("TextLabel", playerContainer)
+playerLbl.Size = UDim2.new(0, 100, 1, 0)
+playerLbl.Position = UDim2.new(0, 12, 0, 0)
+playerLbl.Text = "Player"
+playerLbl.TextColor3 = Color3.fromRGB(240, 240, 245)
+playerLbl.Font = Enum.Font.GothamBold
+playerLbl.TextSize = 13
+playerLbl.TextXAlignment = Enum.TextXAlignment.Left
+playerLbl.BackgroundTransparency = 1
+playerLbl.ZIndex = 5
+
+local playerValLbl = Instance.new("TextLabel", playerContainer)
+playerValLbl.Size = UDim2.new(0, 120, 1, 0)
+playerValLbl.Position = UDim2.new(0, 100, 0, 0)
+playerValLbl.Text = "—"
+playerValLbl.TextColor3 = Color3.fromRGB(255, 40, 70)
+playerValLbl.Font = Enum.Font.GothamBold
+playerValLbl.TextSize = 11
+playerValLbl.TextXAlignment = Enum.TextXAlignment.Left
+playerValLbl.TextTruncate = Enum.TextTruncate.AtEnd
+playerValLbl.BackgroundTransparency = 1
+playerValLbl.ZIndex = 5
+
+local playerIdx = 0
+local playerListCache = {}
+
+local function getOtherPlayers()
+    local list = {}
+    for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+        if p ~= LocalPlayer then table.insert(list, p.Name) end
+    end
+    return list
+end
+
+local function updatePlayerLabel()
+    if #playerListCache == 0 then
+        playerValLbl.Text = "—"
+        TrdState.selectedPlayer = nil
+    else
+        if playerIdx < 1 then playerIdx = #playerListCache end
+        if playerIdx > #playerListCache then playerIdx = 1 end
+        playerValLbl.Text = playerListCache[playerIdx]
+        TrdState.selectedPlayer = playerListCache[playerIdx]
+    end
+end
+
+-- Prev button
+local prevBtn = Instance.new("TextButton", playerContainer)
+prevBtn.Size = UDim2.new(0, 26, 0, 26)
+prevBtn.Position = UDim2.new(1, -90, 0.5, -13)
+prevBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+prevBtn.Text = "◀"
+prevBtn.TextColor3 = Color3.fromRGB(255,255,255)
+prevBtn.Font = Enum.Font.GothamBold
+prevBtn.TextSize = 11
+prevBtn.ZIndex = 5
+Instance.new("UICorner", prevBtn).CornerRadius = UDim.new(0, 6)
+prevBtn.MouseButton1Click:Connect(function()
+    playerListCache = getOtherPlayers()
+    playerIdx = playerIdx - 1
+    updatePlayerLabel()
+end)
+
+-- Next button
+local nextBtn = Instance.new("TextButton", playerContainer)
+nextBtn.Size = UDim2.new(0, 26, 0, 26)
+nextBtn.Position = UDim2.new(1, -60, 0.5, -13)
+nextBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+nextBtn.Text = "▶"
+nextBtn.TextColor3 = Color3.fromRGB(255,255,255)
+nextBtn.Font = Enum.Font.GothamBold
+nextBtn.TextSize = 11
+nextBtn.ZIndex = 5
+Instance.new("UICorner", nextBtn).CornerRadius = UDim.new(0, 6)
+nextBtn.MouseButton1Click:Connect(function()
+    playerListCache = getOtherPlayers()
+    playerIdx = playerIdx + 1
+    updatePlayerLabel()
+end)
+
+-- Refresh button
+local refreshBtn = Instance.new("TextButton", playerContainer)
+refreshBtn.Size = UDim2.new(0, 26, 0, 26)
+refreshBtn.Position = UDim2.new(1, -30, 0.5, -13)
+refreshBtn.BackgroundColor3 = Color3.fromRGB(255, 40, 70)
+refreshBtn.Text = "↺"
+refreshBtn.TextColor3 = Color3.fromRGB(255,255,255)
+refreshBtn.Font = Enum.Font.GothamBold
+refreshBtn.TextSize = 14
+refreshBtn.ZIndex = 5
+Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0, 6)
+refreshBtn.MouseButton1Click:Connect(function()
+    playerListCache = getOtherPlayers()
+    playerIdx = 1
+    updatePlayerLabel()
+end)
+
+-- ========================
+-- SELECTOR ANGKA TOOL (prev/next)
+-- ========================
+local toolOptions = {"Any", "1", "2", "3", "4", "5"}
+local toolIdx = 1
+
+local toolContainer = Instance.new("Frame", ContentTrd)
+toolContainer.Size = UDim2.new(1, -30, 0, 46)
+toolContainer.Position = UDim2.new(0, 15, 0, 95)
+toolContainer.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+toolContainer.BackgroundTransparency = 0.4
+toolContainer.ZIndex = 4
+Instance.new("UICorner", toolContainer).CornerRadius = UDim.new(0, 10)
+
+local toolLbl = Instance.new("TextLabel", toolContainer)
+toolLbl.Size = UDim2.new(0, 100, 1, 0)
+toolLbl.Position = UDim2.new(0, 12, 0, 0)
+toolLbl.Text = "Jumlah"
+toolLbl.TextColor3 = Color3.fromRGB(240, 240, 245)
+toolLbl.Font = Enum.Font.GothamBold
+toolLbl.TextSize = 13
+toolLbl.TextXAlignment = Enum.TextXAlignment.Left
+toolLbl.BackgroundTransparency = 1
+toolLbl.ZIndex = 5
+
+local toolValLbl = Instance.new("TextLabel", toolContainer)
+toolValLbl.Size = UDim2.new(0, 80, 1, 0)
+toolValLbl.Position = UDim2.new(0, 100, 0, 0)
+toolValLbl.Text = "Any"
+toolValLbl.TextColor3 = Color3.fromRGB(255, 40, 70)
+toolValLbl.Font = Enum.Font.GothamBold
+toolValLbl.TextSize = 13
+toolValLbl.TextXAlignment = Enum.TextXAlignment.Left
+toolValLbl.BackgroundTransparency = 1
+toolValLbl.ZIndex = 5
+
+local toolPrevBtn = Instance.new("TextButton", toolContainer)
+toolPrevBtn.Size = UDim2.new(0, 26, 0, 26)
+toolPrevBtn.Position = UDim2.new(1, -90, 0.5, -13)
+toolPrevBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+toolPrevBtn.Text = "◀"
+toolPrevBtn.TextColor3 = Color3.fromRGB(255,255,255)
+toolPrevBtn.Font = Enum.Font.GothamBold
+toolPrevBtn.TextSize = 11
+toolPrevBtn.ZIndex = 5
+Instance.new("UICorner", toolPrevBtn).CornerRadius = UDim.new(0, 6)
+toolPrevBtn.MouseButton1Click:Connect(function()
+    toolIdx = toolIdx - 1
+    if toolIdx < 1 then toolIdx = #toolOptions end
+    TrdState.selectedCount = toolOptions[toolIdx]
+    toolValLbl.Text = toolOptions[toolIdx]
+end)
+
+local toolNextBtn = Instance.new("TextButton", toolContainer)
+toolNextBtn.Size = UDim2.new(0, 26, 0, 26)
+toolNextBtn.Position = UDim2.new(1, -60, 0.5, -13)
+toolNextBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+toolNextBtn.Text = "▶"
+toolNextBtn.TextColor3 = Color3.fromRGB(255,255,255)
+toolNextBtn.Font = Enum.Font.GothamBold
+toolNextBtn.TextSize = 11
+toolNextBtn.ZIndex = 5
+Instance.new("UICorner", toolNextBtn).CornerRadius = UDim.new(0, 6)
+toolNextBtn.MouseButton1Click:Connect(function()
+    toolIdx = toolIdx + 1
+    if toolIdx > #toolOptions then toolIdx = 1 end
+    TrdState.selectedCount = toolOptions[toolIdx]
+    toolValLbl.Text = toolOptions[toolIdx]
+end)
+
+-- ========================
+-- TOGGLE AUTO TRD
+-- ========================
+local trdToggleContainer = Instance.new("Frame", ContentTrd)
+trdToggleContainer.Size = UDim2.new(1, -30, 0, 46)
+trdToggleContainer.Position = UDim2.new(0, 15, 0, 150)
+trdToggleContainer.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+trdToggleContainer.BackgroundTransparency = 0.4
+trdToggleContainer.ZIndex = 4
+Instance.new("UICorner", trdToggleContainer).CornerRadius = UDim.new(0, 10)
+
+local trdToggleLbl = Instance.new("TextLabel", trdToggleContainer)
+trdToggleLbl.Size = UDim2.new(0, 200, 1, 0)
+trdToggleLbl.Position = UDim2.new(0, 15, 0, 0)
+trdToggleLbl.Text = "Auto TRD"
+trdToggleLbl.TextColor3 = Color3.fromRGB(240, 240, 245)
+trdToggleLbl.Font = Enum.Font.GothamBold
+trdToggleLbl.TextSize = 14
+trdToggleLbl.TextXAlignment = Enum.TextXAlignment.Left
+trdToggleLbl.BackgroundTransparency = 1
+trdToggleLbl.ZIndex = 5
+
+local trdSwitchBg = Instance.new("TextButton", trdToggleContainer)
+trdSwitchBg.Size = UDim2.new(0, 48, 0, 26)
+trdSwitchBg.Position = UDim2.new(1, -63, 0.5, -13)
+trdSwitchBg.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+trdSwitchBg.Text = ""
+trdSwitchBg.ZIndex = 5
+Instance.new("UICorner", trdSwitchBg).CornerRadius = UDim.new(1, 0)
+
+local trdCircle = Instance.new("Frame", trdSwitchBg)
+trdCircle.Size = UDim2.new(0, 20, 0, 20)
+trdCircle.Position = UDim2.new(0, 3, 0.5, -10)
+trdCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+trdCircle.ZIndex = 6
+Instance.new("UICorner", trdCircle).CornerRadius = UDim.new(1, 0)
+
+local function doTRD()
+    if not TrdState.selectedPlayer then return end
+    local targetPlayer = game:GetService("Players"):FindFirstChild(TrdState.selectedPlayer)
+    if not targetPlayer then return end
+    local RequestGift = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RequestGift")
+    local count
+    if TrdState.selectedCount == "Any" then
+        local n = 0
+        for _, t in ipairs(LocalPlayer.Backpack:GetChildren()) do
+            if t:IsA("Tool") then
+                local tip = (t.ToolTip or ""):lower()
+                local nm  = t.Name:lower()
+                if not string.find(tip, "treadmill") and not string.find(nm, "treadmill") then
+                    n = n + 1
+                end
+            end
+        end
+        count = n
+    else
+        count = tonumber(TrdState.selectedCount) or 1
+    end
+    for i = 1, count do
+        if not trdRunning then break end
+        local char = LocalPlayer.Character
+        if not char then break end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local tool = getValidTool(LocalPlayer.Backpack)
+        if tool and hum then
+            pcall(function() hum:EquipTool(tool) end)
+            task.wait(0.1)
+        end
+        pcall(function() RequestGift:FireServer(targetPlayer) end)
+        task.wait(0.2)
+    end
+end
+
+trdSwitchBg.MouseButton1Click:Connect(function()
+    trdRunning = not trdRunning
+    TweenService:Create(trdCircle, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        Position = trdRunning and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 3, 0.5, -10)
+    }):Play()
+    TweenService:Create(trdSwitchBg, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        BackgroundColor3 = trdRunning and Color3.fromRGB(52, 199, 89) or Color3.fromRGB(45, 45, 55)
+    }):Play()
+    if trdRunning then
+        task.spawn(function()
+            while trdRunning do
+                pcall(doTRD)
+                task.wait(0.1)
+            end
+        end)
+    end
 end)
 
 -- ========================
