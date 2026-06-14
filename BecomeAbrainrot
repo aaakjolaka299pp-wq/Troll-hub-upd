@@ -607,6 +607,32 @@ task.spawn(function()
     end
 end)
 
+-- AUTO ACCEPT TRD loop
+local AutoAcceptTRD = false
+task.spawn(function()
+    while true do
+        if AutoAcceptTRD then
+            pcall(function()
+                local pg = game:GetService("Players").LocalPlayer.PlayerGui
+                for _, gui in ipairs(pg:GetDescendants()) do
+                    if gui:IsA("Frame") and gui.Name == "Gift" and gui.Visible then
+                        local acceptBtn = gui:FindFirstChild("Accept")
+                        if acceptBtn and acceptBtn:IsA("TextButton") and acceptBtn.Visible then
+                            pcall(function() firesignal(acceptBtn.MouseButton1Click) end)
+                            pcall(function() firesignal(acceptBtn.Activated) end)
+                            task.wait(0.2)
+                            if gui and gui.Parent then
+                                gui.Visible = false
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        task.wait(0.1)
+    end
+end)
+
 -- ========================
 -- CONTENT: INFORMATION
 -- ========================
@@ -753,47 +779,11 @@ trdTitle.ZIndex = 4
 
 local TrdState = {
     selectedPlayer = nil,
-    selectedCount  = "Any",
+    selectedCount  = "All",
 }
 local trdRunning = false
 
--- ========================
--- SELECTOR PLAYER (prev/next)
--- ========================
-local playerContainer = Instance.new("Frame", ContentTrd)
-playerContainer.Size = UDim2.new(1, -30, 0, 46)
-playerContainer.Position = UDim2.new(0, 15, 0, 40)
-playerContainer.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
-playerContainer.BackgroundTransparency = 0.4
-playerContainer.ZIndex = 4
-Instance.new("UICorner", playerContainer).CornerRadius = UDim.new(0, 10)
-
-local playerLbl = Instance.new("TextLabel", playerContainer)
-playerLbl.Size = UDim2.new(0, 100, 1, 0)
-playerLbl.Position = UDim2.new(0, 12, 0, 0)
-playerLbl.Text = "Player"
-playerLbl.TextColor3 = Color3.fromRGB(240, 240, 245)
-playerLbl.Font = Enum.Font.GothamBold
-playerLbl.TextSize = 13
-playerLbl.TextXAlignment = Enum.TextXAlignment.Left
-playerLbl.BackgroundTransparency = 1
-playerLbl.ZIndex = 5
-
-local playerValLbl = Instance.new("TextLabel", playerContainer)
-playerValLbl.Size = UDim2.new(0, 120, 1, 0)
-playerValLbl.Position = UDim2.new(0, 100, 0, 0)
-playerValLbl.Text = "—"
-playerValLbl.TextColor3 = Color3.fromRGB(255, 40, 70)
-playerValLbl.Font = Enum.Font.GothamBold
-playerValLbl.TextSize = 11
-playerValLbl.TextXAlignment = Enum.TextXAlignment.Left
-playerValLbl.TextTruncate = Enum.TextTruncate.AtEnd
-playerValLbl.BackgroundTransparency = 1
-playerValLbl.ZIndex = 5
-
-local playerIdx = 0
-local playerListCache = {}
-
+-- helper
 local function getOtherPlayers()
     local list = {}
     for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
@@ -802,137 +792,269 @@ local function getOtherPlayers()
     return list
 end
 
-local function updatePlayerLabel()
-    if #playerListCache == 0 then
-        playerValLbl.Text = "—"
-        TrdState.selectedPlayer = nil
-    else
-        if playerIdx < 1 then playerIdx = #playerListCache end
-        if playerIdx > #playerListCache then playerIdx = 1 end
-        playerValLbl.Text = playerListCache[playerIdx]
-        TrdState.selectedPlayer = playerListCache[playerIdx]
-    end
+-- ========================
+-- SELECTOR PLAYER
+-- ========================
+local playerHeader = Instance.new("Frame", ContentTrd)
+playerHeader.Size = UDim2.new(1, -30, 0, 36)
+playerHeader.Position = UDim2.new(0, 15, 0, 40)
+playerHeader.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+playerHeader.BackgroundTransparency = 0.4
+playerHeader.ZIndex = 6
+Instance.new("UICorner", playerHeader).CornerRadius = UDim.new(0, 8)
+
+local playerLbl = Instance.new("TextLabel", playerHeader)
+playerLbl.Size = UDim2.new(0, 80, 1, 0)
+playerLbl.Position = UDim2.new(0, 12, 0, 0)
+playerLbl.Text = "Player"
+playerLbl.TextColor3 = Color3.fromRGB(200, 200, 210)
+playerLbl.Font = Enum.Font.GothamBold
+playerLbl.TextSize = 12
+playerLbl.TextXAlignment = Enum.TextXAlignment.Left
+playerLbl.BackgroundTransparency = 1
+playerLbl.ZIndex = 7
+
+local playerValLbl = Instance.new("TextLabel", playerHeader)
+playerValLbl.Size = UDim2.new(0, 130, 1, 0)
+playerValLbl.Position = UDim2.new(0, 85, 0, 0)
+playerValLbl.Text = "— Pilih Player —"
+playerValLbl.TextColor3 = Color3.fromRGB(255, 40, 70)
+playerValLbl.Font = Enum.Font.GothamBold
+playerValLbl.TextSize = 11
+playerValLbl.TextXAlignment = Enum.TextXAlignment.Left
+playerValLbl.TextTruncate = Enum.TextTruncate.AtEnd
+playerValLbl.BackgroundTransparency = 1
+playerValLbl.ZIndex = 7
+
+local playerRefreshBtn = Instance.new("TextButton", playerHeader)
+playerRefreshBtn.Size = UDim2.new(0, 26, 0, 26)
+playerRefreshBtn.Position = UDim2.new(1, -62, 0.5, -13)
+playerRefreshBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+playerRefreshBtn.BackgroundTransparency = 0
+playerRefreshBtn.Text = "↺"
+playerRefreshBtn.TextColor3 = Color3.fromRGB(255,255,255)
+playerRefreshBtn.Font = Enum.Font.GothamBold
+playerRefreshBtn.TextSize = 13
+playerRefreshBtn.ZIndex = 7
+Instance.new("UICorner", playerRefreshBtn).CornerRadius = UDim.new(1, 0)
+
+local playerDropBtn = Instance.new("TextButton", playerHeader)
+playerDropBtn.Size = UDim2.new(0, 26, 0, 26)
+playerDropBtn.Position = UDim2.new(1, -32, 0.5, -13)
+playerDropBtn.BackgroundColor3 = Color3.fromRGB(255, 40, 70)
+playerDropBtn.Text = "▼"
+playerDropBtn.TextColor3 = Color3.fromRGB(255,255,255)
+playerDropBtn.Font = Enum.Font.GothamBold
+playerDropBtn.TextSize = 11
+playerDropBtn.ZIndex = 7
+Instance.new("UICorner", playerDropBtn).CornerRadius = UDim.new(0, 6)
+
+-- Scroll list player
+local playerScroll = Instance.new("ScrollingFrame", ContentTrd)
+playerScroll.Size = UDim2.new(1, -30, 0, 0)
+playerScroll.Position = UDim2.new(0, 15, 0, 78)
+playerScroll.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
+playerScroll.BackgroundTransparency = 0.2
+playerScroll.BorderSizePixel = 0
+playerScroll.ScrollBarThickness = 3
+playerScroll.ScrollBarImageColor3 = Color3.fromRGB(255, 40, 70)
+playerScroll.Visible = false
+playerScroll.ZIndex = 8
+playerScroll.ClipsDescendants = true
+Instance.new("UICorner", playerScroll).CornerRadius = UDim.new(0, 8)
+local playerScrollLayout = Instance.new("UIListLayout", playerScroll)
+playerScrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
+playerScrollLayout.Padding = UDim.new(0, 2)
+
+local playerDropOpen = false
+
+local function closePlayerDrop()
+    playerDropOpen = false
+    playerDropBtn.Text = "▼"
+    TweenService:Create(playerScroll, TweenInfo.new(0.15), {Size = UDim2.new(1, -30, 0, 0)}):Play()
+    task.delay(0.15, function() playerScroll.Visible = false end)
 end
 
--- Prev button
-local prevBtn = Instance.new("TextButton", playerContainer)
-prevBtn.Size = UDim2.new(0, 26, 0, 26)
-prevBtn.Position = UDim2.new(1, -90, 0.5, -13)
-prevBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-prevBtn.Text = "◀"
-prevBtn.TextColor3 = Color3.fromRGB(255,255,255)
-prevBtn.Font = Enum.Font.GothamBold
-prevBtn.TextSize = 11
-prevBtn.ZIndex = 5
-Instance.new("UICorner", prevBtn).CornerRadius = UDim.new(0, 6)
-prevBtn.MouseButton1Click:Connect(function()
-    playerListCache = getOtherPlayers()
-    playerIdx = playerIdx - 1
-    updatePlayerLabel()
+local function buildPlayerList()
+    for _, c in ipairs(playerScroll:GetChildren()) do
+        if c:IsA("TextButton") then c:Destroy() end
+    end
+    local list = getOtherPlayers()
+    for _, name in ipairs(list) do
+        local btn = Instance.new("TextButton", playerScroll)
+        btn.Size = UDim2.new(1, 0, 0, 30)
+        btn.BackgroundTransparency = 1
+        btn.Text = "  " .. name
+        btn.TextColor3 = Color3.fromRGB(220, 220, 230)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 12
+        btn.TextXAlignment = Enum.TextXAlignment.Left
+        btn.ZIndex = 9
+        btn.MouseButton1Click:Connect(function()
+            TrdState.selectedPlayer = name
+            playerValLbl.Text = name
+            closePlayerDrop()
+        end)
+    end
+    local h = math.min(#list * 32, 120)
+    playerScroll.CanvasSize = UDim2.new(0, 0, 0, #list * 32)
+    return h
+end
+
+playerDropBtn.MouseButton1Click:Connect(function()
+    if playerDropOpen then
+        closePlayerDrop()
+    else
+        playerDropOpen = true
+        playerDropBtn.Text = "▲"
+        local h = buildPlayerList()
+        playerScroll.Visible = true
+        TweenService:Create(playerScroll, TweenInfo.new(0.15), {Size = UDim2.new(1, -30, 0, h)}):Play()
+    end
 end)
 
--- Next button
-local nextBtn = Instance.new("TextButton", playerContainer)
-nextBtn.Size = UDim2.new(0, 26, 0, 26)
-nextBtn.Position = UDim2.new(1, -60, 0.5, -13)
-nextBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-nextBtn.Text = "▶"
-nextBtn.TextColor3 = Color3.fromRGB(255,255,255)
-nextBtn.Font = Enum.Font.GothamBold
-nextBtn.TextSize = 11
-nextBtn.ZIndex = 5
-Instance.new("UICorner", nextBtn).CornerRadius = UDim.new(0, 6)
-nextBtn.MouseButton1Click:Connect(function()
-    playerListCache = getOtherPlayers()
-    playerIdx = playerIdx + 1
-    updatePlayerLabel()
-end)
-
--- Refresh button
-local refreshBtn = Instance.new("TextButton", playerContainer)
-refreshBtn.Size = UDim2.new(0, 26, 0, 26)
-refreshBtn.Position = UDim2.new(1, -30, 0.5, -13)
-refreshBtn.BackgroundColor3 = Color3.fromRGB(255, 40, 70)
-refreshBtn.Text = "↺"
-refreshBtn.TextColor3 = Color3.fromRGB(255,255,255)
-refreshBtn.Font = Enum.Font.GothamBold
-refreshBtn.TextSize = 14
-refreshBtn.ZIndex = 5
-Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0, 6)
-refreshBtn.MouseButton1Click:Connect(function()
-    playerListCache = getOtherPlayers()
-    playerIdx = 1
-    updatePlayerLabel()
+playerRefreshBtn.MouseButton1Click:Connect(function()
+    TrdState.selectedPlayer = nil
+    playerValLbl.Text = "— Pilih Player —"
+    if playerDropOpen then
+        buildPlayerList()
+    end
 end)
 
 -- ========================
--- SELECTOR ANGKA TOOL (prev/next)
+-- SELECTOR ANGKA TOOL
 -- ========================
-local toolOptions = {"Any", "1", "2", "3", "4", "5"}
-local toolIdx = 1
+local toolOptions = {"All"}  -- akan diisi dynamic
 
-local toolContainer = Instance.new("Frame", ContentTrd)
-toolContainer.Size = UDim2.new(1, -30, 0, 46)
-toolContainer.Position = UDim2.new(0, 15, 0, 95)
-toolContainer.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
-toolContainer.BackgroundTransparency = 0.4
-toolContainer.ZIndex = 4
-Instance.new("UICorner", toolContainer).CornerRadius = UDim.new(0, 10)
+local toolHeader = Instance.new("Frame", ContentTrd)
+toolHeader.Size = UDim2.new(1, -30, 0, 36)
+toolHeader.Position = UDim2.new(0, 15, 0, 85)
+toolHeader.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+toolHeader.BackgroundTransparency = 0.4
+toolHeader.ZIndex = 5
+Instance.new("UICorner", toolHeader).CornerRadius = UDim.new(0, 8)
 
-local toolLbl = Instance.new("TextLabel", toolContainer)
-toolLbl.Size = UDim2.new(0, 100, 1, 0)
+local toolLbl = Instance.new("TextLabel", toolHeader)
+toolLbl.Size = UDim2.new(0, 80, 1, 0)
 toolLbl.Position = UDim2.new(0, 12, 0, 0)
 toolLbl.Text = "Jumlah"
-toolLbl.TextColor3 = Color3.fromRGB(240, 240, 245)
+toolLbl.TextColor3 = Color3.fromRGB(200, 200, 210)
 toolLbl.Font = Enum.Font.GothamBold
-toolLbl.TextSize = 13
+toolLbl.TextSize = 12
 toolLbl.TextXAlignment = Enum.TextXAlignment.Left
 toolLbl.BackgroundTransparency = 1
-toolLbl.ZIndex = 5
+toolLbl.ZIndex = 6
 
-local toolValLbl = Instance.new("TextLabel", toolContainer)
-toolValLbl.Size = UDim2.new(0, 80, 1, 0)
-toolValLbl.Position = UDim2.new(0, 100, 0, 0)
-toolValLbl.Text = "Any"
+local toolValLbl = Instance.new("TextLabel", toolHeader)
+toolValLbl.Size = UDim2.new(0, 100, 1, 0)
+toolValLbl.Position = UDim2.new(0, 85, 0, 0)
+toolValLbl.Text = "All"
 toolValLbl.TextColor3 = Color3.fromRGB(255, 40, 70)
 toolValLbl.Font = Enum.Font.GothamBold
-toolValLbl.TextSize = 13
+toolValLbl.TextSize = 12
 toolValLbl.TextXAlignment = Enum.TextXAlignment.Left
 toolValLbl.BackgroundTransparency = 1
-toolValLbl.ZIndex = 5
+toolValLbl.ZIndex = 6
 
-local toolPrevBtn = Instance.new("TextButton", toolContainer)
-toolPrevBtn.Size = UDim2.new(0, 26, 0, 26)
-toolPrevBtn.Position = UDim2.new(1, -90, 0.5, -13)
-toolPrevBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-toolPrevBtn.Text = "◀"
-toolPrevBtn.TextColor3 = Color3.fromRGB(255,255,255)
-toolPrevBtn.Font = Enum.Font.GothamBold
-toolPrevBtn.TextSize = 11
-toolPrevBtn.ZIndex = 5
-Instance.new("UICorner", toolPrevBtn).CornerRadius = UDim.new(0, 6)
-toolPrevBtn.MouseButton1Click:Connect(function()
-    toolIdx = toolIdx - 1
-    if toolIdx < 1 then toolIdx = #toolOptions end
-    TrdState.selectedCount = toolOptions[toolIdx]
-    toolValLbl.Text = toolOptions[toolIdx]
-end)
+local toolDropBtn = Instance.new("TextButton", toolHeader)
+toolDropBtn.Size = UDim2.new(0, 26, 0, 26)
+toolDropBtn.Position = UDim2.new(1, -32, 0.5, -13)
+toolDropBtn.BackgroundColor3 = Color3.fromRGB(255, 40, 70)
+toolDropBtn.Text = "▼"
+toolDropBtn.TextColor3 = Color3.fromRGB(255,255,255)
+toolDropBtn.Font = Enum.Font.GothamBold
+toolDropBtn.TextSize = 11
+toolDropBtn.ZIndex = 6
+Instance.new("UICorner", toolDropBtn).CornerRadius = UDim.new(0, 6)
 
-local toolNextBtn = Instance.new("TextButton", toolContainer)
-toolNextBtn.Size = UDim2.new(0, 26, 0, 26)
-toolNextBtn.Position = UDim2.new(1, -60, 0.5, -13)
-toolNextBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
-toolNextBtn.Text = "▶"
-toolNextBtn.TextColor3 = Color3.fromRGB(255,255,255)
-toolNextBtn.Font = Enum.Font.GothamBold
-toolNextBtn.TextSize = 11
-toolNextBtn.ZIndex = 5
-Instance.new("UICorner", toolNextBtn).CornerRadius = UDim.new(0, 6)
-toolNextBtn.MouseButton1Click:Connect(function()
-    toolIdx = toolIdx + 1
-    if toolIdx > #toolOptions then toolIdx = 1 end
-    TrdState.selectedCount = toolOptions[toolIdx]
-    toolValLbl.Text = toolOptions[toolIdx]
+local toolScroll = Instance.new("ScrollingFrame", ContentTrd)
+toolScroll.Size = UDim2.new(1, -30, 0, 0)
+toolScroll.Position = UDim2.new(0, 15, 0, 123)
+toolScroll.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
+toolScroll.BackgroundTransparency = 0.2
+toolScroll.BorderSizePixel = 0
+toolScroll.ScrollBarThickness = 3
+toolScroll.ScrollBarImageColor3 = Color3.fromRGB(255, 40, 70)
+toolScroll.Visible = false
+toolScroll.ZIndex = 7
+toolScroll.ClipsDescendants = true
+Instance.new("UICorner", toolScroll).CornerRadius = UDim.new(0, 8)
+local toolScrollLayout = Instance.new("UIListLayout", toolScroll)
+toolScrollLayout.SortOrder = Enum.SortOrder.LayoutOrder
+toolScrollLayout.Padding = UDim.new(0, 2)
+
+local toolDropOpen = false
+
+local function closeToolDrop()
+    toolDropOpen = false
+    toolDropBtn.Text = "▼"
+    TweenService:Create(toolScroll, TweenInfo.new(0.15), {Size = UDim2.new(1, -30, 0, 0)}):Play()
+    task.delay(0.15, function() toolScroll.Visible = false end)
+end
+
+-- Build tool options dynamic dari backpack
+local function buildToolOptions()
+    for _, c in ipairs(toolScroll:GetChildren()) do
+        if c:IsA("TextButton") then c:Destroy() end
+    end
+    local opts = {"All"}
+    local n = 0
+    for _, t in ipairs(LocalPlayer.Backpack:GetChildren()) do
+        if t:IsA("Tool") then
+            local tip = (t.ToolTip or ""):lower()
+            local nm  = t.Name:lower()
+            if not string.find(tip, "treadmill") and not string.find(nm, "treadmill") then
+                n = n + 1
+            end
+        end
+    end
+    -- tambah tool equipped
+    if LocalPlayer.Character then
+        local eq = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if eq then
+            local tip = (eq.ToolTip or ""):lower()
+            local nm  = eq.Name:lower()
+            if not string.find(tip, "treadmill") and not string.find(nm, "treadmill") then
+                n = n + 1
+            end
+        end
+    end
+    for i = 1, n do
+        table.insert(opts, tostring(i))
+    end
+    for _, opt in ipairs(opts) do
+        local btn = Instance.new("TextButton", toolScroll)
+        btn.Size = UDim2.new(1, 0, 0, 30)
+        btn.BackgroundTransparency = 1
+        btn.Text = "  " .. opt
+        btn.TextColor3 = Color3.fromRGB(220, 220, 230)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 12
+        btn.TextXAlignment = Enum.TextXAlignment.Left
+        btn.ZIndex = 8
+        btn.MouseButton1Click:Connect(function()
+            TrdState.selectedCount = opt
+            toolValLbl.Text = opt
+            closeToolDrop()
+        end)
+    end
+    toolScroll.CanvasSize = UDim2.new(0, 0, 0, #opts * 32)
+    return math.min(#opts * 32, 120), n
+end
+
+toolDropBtn.MouseButton1Click:Connect(function()
+    if toolDropOpen then
+        closeToolDrop()
+    else
+        if playerDropOpen then closePlayerDrop() end
+        toolDropOpen = true
+        toolDropBtn.Text = "▲"
+        local h, _ = buildToolOptions()
+        toolScroll.Visible = true
+        TweenService:Create(toolScroll, TweenInfo.new(0.15), {
+            Size = UDim2.new(1, -30, 0, h)
+        }):Play()
+    end
 end)
 
 -- ========================
@@ -940,7 +1062,7 @@ end)
 -- ========================
 local trdToggleContainer = Instance.new("Frame", ContentTrd)
 trdToggleContainer.Size = UDim2.new(1, -30, 0, 46)
-trdToggleContainer.Position = UDim2.new(0, 15, 0, 150)
+trdToggleContainer.Position = UDim2.new(0, 15, 0, 130)
 trdToggleContainer.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
 trdToggleContainer.BackgroundTransparency = 0.4
 trdToggleContainer.ZIndex = 4
@@ -972,29 +1094,67 @@ trdCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 trdCircle.ZIndex = 6
 Instance.new("UICorner", trdCircle).CornerRadius = UDim.new(1, 0)
 
+local function countValidTools()
+    local n = 0
+    for _, t in ipairs(LocalPlayer.Backpack:GetChildren()) do
+        if t:IsA("Tool") then
+            local tip = (t.ToolTip or ""):lower()
+            local nm  = t.Name:lower()
+            if not string.find(tip, "treadmill") and not string.find(nm, "treadmill") then
+                n = n + 1
+            end
+        end
+    end
+    if LocalPlayer.Character then
+        local eq = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+        if eq then
+            local tip = (eq.ToolTip or ""):lower()
+            local nm  = eq.Name:lower()
+            if not string.find(tip, "treadmill") and not string.find(nm, "treadmill") then
+                n = n + 1
+            end
+        end
+    end
+    return n
+end
+
+local function stopTRD()
+    trdRunning = false
+    TweenService:Create(trdCircle, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        Position = UDim2.new(0, 3, 0.5, -10)
+    }):Play()
+    TweenService:Create(trdSwitchBg, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    }):Play()
+end
+
 local function doTRD()
     if not TrdState.selectedPlayer then return end
     local targetPlayer = game:GetService("Players"):FindFirstChild(TrdState.selectedPlayer)
     if not targetPlayer then return end
     local RequestGift = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RequestGift")
-    local count
-    if TrdState.selectedCount == "Any" then
-        local n = 0
-        for _, t in ipairs(LocalPlayer.Backpack:GetChildren()) do
-            if t:IsA("Tool") then
-                local tip = (t.ToolTip or ""):lower()
-                local nm  = t.Name:lower()
-                if not string.find(tip, "treadmill") and not string.find(nm, "treadmill") then
-                    n = n + 1
-                end
-            end
-        end
-        count = n
+
+    -- Hitung jumlah awal tool sebelum mulai
+    local toolsBefore = countValidTools()
+
+    -- Tentukan berapa yang mau dikirim
+    local sendCount
+    if TrdState.selectedCount == "All" then
+        sendCount = toolsBefore
     else
-        count = tonumber(TrdState.selectedCount) or 1
+        sendCount = tonumber(TrdState.selectedCount) or 1
     end
-    for i = 1, count do
-        if not trdRunning then break end
+
+    -- Target sisa tool setelah selesai
+    local targetRemaining = toolsBefore - sendCount
+
+    while trdRunning do
+        local currentTools = countValidTools()
+        -- Stop kalau sisa tool udah sesuai target
+        if currentTools <= targetRemaining then
+            break
+        end
+
         local char = LocalPlayer.Character
         if not char then break end
         local hum = char:FindFirstChildOfClass("Humanoid")
@@ -1004,8 +1164,10 @@ local function doTRD()
             task.wait(0.1)
         end
         pcall(function() RequestGift:FireServer(targetPlayer) end)
-        task.wait(0.2)
+        task.wait(0.3)
     end
+
+    stopTRD()
 end
 
 trdSwitchBg.MouseButton1Click:Connect(function()
@@ -1018,12 +1180,54 @@ trdSwitchBg.MouseButton1Click:Connect(function()
     }):Play()
     if trdRunning then
         task.spawn(function()
-            while trdRunning do
-                pcall(doTRD)
-                task.wait(0.1)
-            end
+            pcall(doTRD)
         end)
     end
+end)
+
+-- Auto Accept TRD toggle
+local acceptContainer = Instance.new("Frame", ContentTrd)
+acceptContainer.Size = UDim2.new(1, -30, 0, 46)
+acceptContainer.Position = UDim2.new(0, 15, 0, 185)
+acceptContainer.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+acceptContainer.BackgroundTransparency = 0.4
+acceptContainer.ZIndex = 4
+Instance.new("UICorner", acceptContainer).CornerRadius = UDim.new(0, 10)
+
+local acceptLbl = Instance.new("TextLabel", acceptContainer)
+acceptLbl.Size = UDim2.new(0, 200, 1, 0)
+acceptLbl.Position = UDim2.new(0, 15, 0, 0)
+acceptLbl.Text = "Auto Accept TRD"
+acceptLbl.TextColor3 = Color3.fromRGB(240, 240, 245)
+acceptLbl.Font = Enum.Font.GothamBold
+acceptLbl.TextSize = 13
+acceptLbl.TextXAlignment = Enum.TextXAlignment.Left
+acceptLbl.BackgroundTransparency = 1
+acceptLbl.ZIndex = 5
+
+local acceptSwitchBg = Instance.new("TextButton", acceptContainer)
+acceptSwitchBg.Size = UDim2.new(0, 48, 0, 26)
+acceptSwitchBg.Position = UDim2.new(1, -63, 0.5, -13)
+acceptSwitchBg.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+acceptSwitchBg.Text = ""
+acceptSwitchBg.ZIndex = 5
+Instance.new("UICorner", acceptSwitchBg).CornerRadius = UDim.new(1, 0)
+
+local acceptCircle = Instance.new("Frame", acceptSwitchBg)
+acceptCircle.Size = UDim2.new(0, 20, 0, 20)
+acceptCircle.Position = UDim2.new(0, 3, 0.5, -10)
+acceptCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+acceptCircle.ZIndex = 6
+Instance.new("UICorner", acceptCircle).CornerRadius = UDim.new(1, 0)
+
+acceptSwitchBg.MouseButton1Click:Connect(function()
+    AutoAcceptTRD = not AutoAcceptTRD
+    TweenService:Create(acceptCircle, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        Position = AutoAcceptTRD and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 3, 0.5, -10)
+    }):Play()
+    TweenService:Create(acceptSwitchBg, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        BackgroundColor3 = AutoAcceptTRD and Color3.fromRGB(52, 199, 89) or Color3.fromRGB(45, 45, 55)
+    }):Play()
 end)
 
 -- ========================
