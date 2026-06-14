@@ -1,0 +1,166 @@
+if game:GetService("CoreGui"):FindFirstChild("ToraScript") then
+    game:GetService("CoreGui").ToraScript:Destroy()
+end
+
+local gal_l38 = loadstring(game:HttpGet("https://raw.githubusercontent.com/liebertsx/Tora-Library/main/src/librarynew", true))()
+local Climb = gal_l38:CreateWindow("Climb for Lucky Block")
+
+-- ==================== OP LUCKY BLOCK ====================
+local function Block()
+    task.spawn(function()
+        _G.Block = true
+        while _G.Block do
+            pcall(function()
+                local LocalPlayer = game.Players.LocalPlayer
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+                local Bottom = workspace.World.Bottom
+                hrp.CFrame = Bottom:GetPivot() * CFrame.new(-30, 0, 0)
+                task.wait(0.5)
+
+                local Summon = game:GetService("ReplicatedStorage").Remote.Event.Summon
+                local OpenJackpot = Summon:FindFirstChild("[C-S]OpenJackpot")
+                OpenJackpot:FireServer("Box11", 18)
+            end)
+            task.wait(0.1)
+        end
+    end)
+end
+
+Climb:AddToggle({
+    text = "OP Lucky Block",
+    flag = "toggle",
+    state = false,
+    callback = function(state)
+        _G.Block = state
+        if state then Block() end
+    end
+})
+
+-- ==================== WINS FARM ====================
+local function Wins()
+    task.spawn(function()
+        _G.Wins = true
+        while _G.Wins do
+            task.wait()
+            pcall(function()
+                local Bananas = workspace.Bananas
+                game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame = Bananas:GetPivot()
+
+                local Race = game:GetService("ReplicatedStorage").Remote.Event.Race
+                local ClaimTrophy = Race:FindFirstChild("[C-S]ClaimTrophy")
+                ClaimTrophy:FireServer()
+
+                task.wait()
+            end)
+        end
+    end)
+end
+
+Climb:AddToggle({
+    text = "Wins Farm",
+    flag = "toggle2",
+    state = false,
+    callback = function(state)
+        _G.Wins = state
+        if state then Wins() end
+    end
+})
+
+-- ==================== COLLECT CASH ====================
+local function Cash()
+    task.spawn(function()
+        _G.Cash = true
+        while _G.Cash do
+            pcall(function()
+                local LocalPlayer = game:GetService("Players").LocalPlayer
+                local Plot = LocalPlayer:GetAttribute("Plot")
+                local PlotBase = workspace.Plots[Plot].Base
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+
+                -- Cari "Collect" di SELURUH Base, tidak peduli struktur sub-folder
+                -- karena struktur Base[1]/Base[2]/Base[3] bisa beda tiap server
+                for _, obj in pairs(PlotBase:GetDescendants()) do
+                    if obj.Name == "Collect" then
+                        firetouchinterest(hrp, obj, 0)
+                        task.wait(0.1)
+                        firetouchinterest(hrp, obj, 1)
+                        task.wait(0.1)
+                    end
+                end
+            end)
+            task.wait(0.1)
+        end
+    end)
+end
+
+Climb:AddToggle({
+    text = "Collect Cash",
+    flag = "toggle3",
+    state = false,
+    callback = function(state)
+        _G.Cash = state
+        if state then Cash() end
+    end
+})
+
+-- ==================== UPGRADE ALL ====================
+local function Upgrade()
+    task.spawn(function()
+        _G.Upgrade = true
+        while _G.Upgrade do
+            pcall(function()
+                local Animal = game:GetService("ReplicatedStorage").Remote.Event.Animal
+                local TryUpgradeAnimal = Animal:FindFirstChild("[C-S]TryUpgradeAnimal")
+
+                for i = 1, 30 do
+                    TryUpgradeAnimal:FireServer(tostring(i))
+                    task.wait(0.1)
+                end
+            end)
+            task.wait(1)
+        end
+    end)
+end
+
+Climb:AddToggle({
+    text = "Upgrade All",
+    flag = "toggle4",
+    state = false,
+    callback = function(state)
+        _G.Upgrade = state
+        if state then Upgrade() end
+    end
+})
+
+-- ==================== AUTO REBIRTH ====================
+local function Rebirth()
+    task.spawn(function()
+        _G.Rebirth = true
+        while _G.Rebirth do
+            task.wait()
+            pcall(function()
+                local RebirthRemote = game:GetService("ReplicatedStorage").Remote.Event.Rebirth
+                local TryRebirth = RebirthRemote:FindFirstChild("[C-S]TryRebirth")
+                TryRebirth:FireServer()
+
+                task.wait(0.1)
+            end)
+        end
+    end)
+end
+
+Climb:AddToggle({
+    text = "Auto Instant Rebith",
+    flag = "toggle5",
+    state = false,
+    callback = function(state)
+        _G.Rebirth = state
+        if state then Rebirth() end
+    end
+})
+
+Climb:AddLabel({
+    text = "YouTube: RilzHub"
+})
+
+gal_l38:Init()
