@@ -5,8 +5,9 @@ local SupportedMaps = {
     [75888315541325] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Dupe%20pushrock",
     [135882949571046] = "https://pastefy.app/GAxFfLvc/raw", 
     [84575720768520] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/RushLuckyBloks", 
-    [95223801959482] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Brainrott%20Sniper"
-}
+    [95223801959482] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Brainrott%20Sniper", 
+    [92495907247629] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/Climb%20for%20Lucky%20Block"
+} 
 
 local scriptUrl = SupportedMaps[game.PlaceId]
 
