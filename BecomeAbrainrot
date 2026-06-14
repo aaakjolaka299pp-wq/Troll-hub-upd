@@ -24,12 +24,12 @@ local State = {
 -- ========================
 -- GUI ROOT
 -- ========================
-if game.CoreGui:FindFirstChild("RilzHub") then
-    game.CoreGui.RilzHub:Destroy()
+if game.CoreGui:FindFirstChild("RilzzHub") then
+    game.CoreGui.RilzzHub:Destroy()
 end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "RilzHub"
+ScreenGui.Name = "RilzzHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = game.CoreGui
 
@@ -54,11 +54,8 @@ local MiniWidget = Instance.new("TextButton")
 MiniWidget.Name = "MiniWidget"
 MiniWidget.Size = UDim2.new(0, 42, 0, 42)
 MiniWidget.Position = UDim2.new(0, 25, 1, -70)
-MiniWidget.BackgroundColor3 = Color3.fromRGB(255, 40, 70)
-MiniWidget.Text = "R"
-MiniWidget.TextColor3 = Color3.fromRGB(255, 255, 255)
-MiniWidget.Font = Enum.Font.GothamBold
-MiniWidget.TextSize = 16
+MiniWidget.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+MiniWidget.Text = ""
 MiniWidget.Visible = false
 MiniWidget.Parent = ScreenGui
 Instance.new("UICorner", MiniWidget).CornerRadius = UDim.new(1, 0)
@@ -66,6 +63,14 @@ local miniStroke = Instance.new("UIStroke", MiniWidget)
 miniStroke.Thickness = 1.8
 miniStroke.Color = Color3.fromRGB(255, 40, 70)
 miniStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local miniImg = Instance.new("ImageLabel", MiniWidget)
+miniImg.Size = UDim2.new(1, 0, 1, 0)
+miniImg.Position = UDim2.new(0, 0, 0, 0)
+miniImg.BackgroundTransparency = 1
+miniImg.Image = "rbxassetid://81773253114107"
+miniImg.ScaleType = Enum.ScaleType.Fit
+miniImg.ZIndex = 2
+Instance.new("UICorner", miniImg).CornerRadius = UDim.new(1, 0)
 
 -- ========================
 -- TOP BAR
@@ -83,7 +88,7 @@ Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 14)
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Size = UDim2.new(0, 250, 0, 22)
 TitleLabel.Position = UDim2.new(0, 15, 0, 4)
-TitleLabel.Text = "<b>Rilz Hub</b>"
+TitleLabel.Text = "<b>Rilzz Hub</b>"
 TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 TitleLabel.Font = Enum.Font.GothamBold
 TitleLabel.TextSize = 15
@@ -1172,6 +1177,21 @@ liveNotice.TextSize = 12
 liveNotice.TextWrapped = true
 liveNotice.BackgroundTransparency = 1
 liveNotice.ZIndex = 4
+
+-- ========================
+-- ANIME IMAGE (RightPanel bottom)
+-- ========================
+local AnimeImage = Instance.new("ImageLabel")
+AnimeImage.Size = UDim2.new(1, -20, 0, 180)
+AnimeImage.Position = UDim2.new(0, 10, 1, -190)
+AnimeImage.BackgroundTransparency = 1
+AnimeImage.Image = "rbxassetid://140107324186688"
+AnimeImage.ScaleType = Enum.ScaleType.Crop
+AnimeImage.ImageRectSize = Vector2.new(0, 0)
+AnimeImage.ImageRectOffset = Vector2.new(0, 0)
+AnimeImage.ZIndex = 3
+AnimeImage.Parent = RightPanel
+Instance.new("UICorner", AnimeImage).CornerRadius = UDim.new(0, 8)
 
 -- ========================
 -- TAB CLICK EVENTS
