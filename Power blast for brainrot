@@ -1,215 +1,185 @@
 local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local RS = game:GetService("ReplicatedStorage")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local Player = Players.LocalPlayer
 
-local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/liebertsx/Tora-Library/main/src/librarynew"))()
-local window = library:CreateWindow("Rilzz Hub Nich Deck")
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Rilzz Hub",
+    LoadingTitle = "Rilzz Hub",
+    LoadingSubtitle = "Dupe Farm",
+    Theme = "Default",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+})
+
+local Remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("FuseRequest")
+local GiftRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("RequestGiftBrainrot")
+
+local BLACKLIST = { ["Aura"] = true }
 
 -- ========================
 -- HELPERS
 -- ========================
-local function getHRP()
-    local char = player.Character or player.CharacterAdded:Wait()
-    return char:WaitForChild("HumanoidRootPart")
+local function getToolsFromBackpack()
+    local backpack = Player:FindFirstChild("Backpack")
+    if not backpack then return {} end
+    local tools = {}
+    for _, v in ipairs(backpack:GetChildren()) do
+        if v:IsA("Tool") and not BLACKLIST[v.Name] then
+            table.insert(tools, v)
+        end
+    end
+    return tools
 end
 
-local function getMyLot()
-    for _, lot in pairs(workspace.Lots:GetChildren()) do
-        for _, v in pairs(lot:GetAttributes()) do
-            if v == player.Name or v == player.UserId then
-                return lot
-            end
-        end
+local function countTools()
+    return #getToolsFromBackpack()
+end
+
+local function getToolFromBackpack()
+    return getToolsFromBackpack()[1]
+end
+
+local function equipTool(tool)
+    if Player.Character and tool then
+        tool.Parent = Player.Character
+        task.wait(0.2)
     end
 end
 
-local function tweenTo(targetCFrame)
-    local hrp = getHRP()
-    local tween = TweenService:Create(hrp, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {
-        CFrame = targetCFrame
-    })
-    tween:Play()
-    tween.Completed:Wait()
+local function resetChar()
+    local oldChar = Player.Character
+    if oldChar and oldChar:FindFirstChild("Humanoid") then
+        oldChar.Humanoid.Health = 0
+    end
+    repeat task.wait() until Player.Character and Player.Character ~= oldChar
+    local char = Player.Character
+    char:WaitForChild("Humanoid")
+    char:WaitForChild("HumanoidRootPart")
+    task.wait(1)
 end
+
+-- ========================
+-- STATE
+-- ========================
+_G.dupeActive = false
+_G.targetPlayer = ""
+
+local playerNames = {}
+for _, p in pairs(Players:GetPlayers()) do
+    if p ~= Player then
+        table.insert(playerNames, p.Name)
+    end
+end
+_G.targetPlayer = playerNames[1] or ""
 
 -- ========================
 -- GUI
 -- ========================
-local playerNames = {}
-for _, p in pairs(Players:GetPlayers()) do
-    if p ~= player then
-        table.insert(playerNames, p.Name)
-    end
+local MainTab = Window:CreateTab("Main", 4483362458)
+
+if #playerNames > 0 then
+    MainTab:CreateDropdown({
+        Name = "Target Player",
+        Options = playerNames,
+        CurrentOption = {playerNames[1]},
+        Flag = "target_player",
+        Callback = function(val)
+            _G.targetPlayer = val[1]
+        end
+    })
 end
 
-_G.targetPlayer = playerNames[1] or ""
-
-local playerList = window:AddList({
-    text = "Target Player",
-    values = playerNames,
-    value = _G.targetPlayer,
-    callback = function(val)
-        _G.targetPlayer = val
-        print("Target:", val)
+MainTab:CreateToggle({
+    Name = "Dupe",
+    CurrentValue = false,
+    Flag = "dupe_toggle",
+    Callback = function(val)
+        _G.dupeActive = val
     end
 })
-
-_G.dupe = false
-
-window:AddToggle({
-    text = "Dupe",
-    value = false,
-    callback = function(val)
-        _G.dupe = val
-        print(_G.dupe and "Dupe ON" or "Dupe OFF")
-    end
-})
-
-library:Init()
 
 Players.PlayerAdded:Connect(function(p)
-    if p ~= player then playerList:AddValue(p.Name) end
-end)
-Players.PlayerRemoving:Connect(function(p)
-    playerList:RemoveValue(p.Name)
+    if p ~= Player then
+        table.insert(playerNames, p.Name)
+    end
 end)
 
 -- ========================
--- MAIN DUPE LOOP
+-- DUPE LOOP
+-- Alur:
+-- Equip+Deposit x4 → Reset → Return x4 → Ulangi sampai tool >= 8
+-- Kalau sudah 8 → Gift 7 ke target → Lanjut deposit lagi
 -- ========================
 coroutine.wrap(function()
     while true do
         task.wait(0.1)
-        if not _G.dupe then continue end
+        if not _G.dupeActive then continue end
 
         pcall(function()
-            local myLot = getMyLot()
-            if not myLot then return end
-
-            -- ====================
-            -- PHASE 1: PLACE SEMUA
-            -- ====================
-            while _G.dupe do
-                local placePrompt = nil
-                for _, v in pairs(myLot:GetDescendants()) do
-                    if v:IsA("ProximityPrompt") and v.ActionText == "Place Here" then
-                        placePrompt = v
-                        break
-                    end
-                end
-
-                if not placePrompt then
-                    print("Place habis, lanjut pickup")
-                    break
-                end
-
-                -- Tween ke prompt
-                tweenTo(placePrompt.Parent.CFrame)
-                task.wait(0.15)
-
-                -- Tween ke prompt
-                tweenTo(placePrompt.Parent.CFrame)
-                task.wait(0.15)
-
-                -- Fire place
-                fireproximityprompt(placePrompt)
-                print("Placed!")
-                task.wait(0.5)
-
-                -- Reset
-                player.Character:FindFirstChildOfClass("Humanoid").Health = 0
-
-                -- Blast aktif setelah reset
-                local blastActive = true
-                task.spawn(function()
-                    while blastActive do
-                        pcall(function()
-                            RS.Remotes.GetBlastStyleData:InvokeServer()
-                        end)
-                        task.wait(0.01)
-                    end
-                end)
-
-                -- Tunggu respawn, lalu blast berhenti
-                player.CharacterAdded:Wait()
-                blastActive = false
-                task.wait(0.1)
-            end
-
-            -- ====================
-            -- PHASE 2: PICKUP SEMUA
-            -- ====================
-            while _G.dupe do
-                local pickupPrompt = nil
-                for _, v in pairs(myLot:GetDescendants()) do
-                    if v:IsA("ProximityPrompt") and v.ActionText == "Pick Up" then
-                        pickupPrompt = v
-                        break
-                    end
-                end
-
-                if not pickupPrompt then
-                    print("Pickup habis, lanjut gift")
-                    break
-                end
-
-                local tpTarget = pickupPrompt.Parent.Parent
-                if tpTarget and tpTarget:IsA("BasePart") then
-                    tweenTo(tpTarget.CFrame + Vector3.new(0, 3, 0))
-                end
-                task.wait(0.1)
-                fireproximityprompt(pickupPrompt)
-                print("Picked up!")
+            -- STEP 1: Equip + Deposit x4
+            for i = 1, 4 do
+                if not _G.dupeActive then return end
+                local tool = getToolFromBackpack()
+                if not tool then break end
+                equipTool(tool)
+                Remote:FireServer({ action = "deposit_held" })
                 task.wait(0.2)
             end
 
-            -- ====================
-            -- PHASE 3: GIFT SEMUA (stop saat sisa 1)
-            -- ====================
-            while _G.dupe do
+            if not _G.dupeActive then return end
+
+            -- STEP 2: Reset
+            resetChar()
+
+            if not _G.dupeActive then return end
+
+            -- STEP 3: Return x4
+            for i = 1, 4 do
+                if not _G.dupeActive then return end
+                Remote:FireServer({ action = "return_item", index = 1 })
+                task.wait(0.2)
+            end
+
+            if not _G.dupeActive then return end
+
+            -- STEP 4: Kalau tool belum 8, ulang deposit dulu
+            if countTools() < 8 then return end
+
+            -- STEP 5: Sudah 8 tool → Gift 7 ke target (sisakan 1)
+            local gifted = 0
+            while _G.dupeActive and gifted < 7 do
                 local target = Players:FindFirstChild(_G.targetPlayer)
                 if not target or not target.Character then
-                    print("Target tidak ditemukan!")
+                    task.wait(1)
                     break
                 end
 
-                local backpack = player:FindFirstChild("Backpack")
-                if not backpack then break end
+                local tools = getToolsFromBackpack()
+                if #tools <= 1 then break end
 
-                -- Hitung tool bukan aura
-                local brainrotTools = {}
-                for _, tool in pairs(backpack:GetChildren()) do
-                    if tool:IsA("Tool") and not tool.Name:lower():find("aura") then
-                        table.insert(brainrotTools, tool)
-                    end
-                end
-
-                -- Stop kalau sisa 1
-                if #brainrotTools <= 1 then
-                    print("Brainrot sisa 1, balik ke place!")
-                    break
-                end
-
-                -- Tween ke target
                 local targetHRP = target.Character:FindFirstChild("HumanoidRootPart")
                 if targetHRP then
-                    tweenTo(targetHRP.CFrame + Vector3.new(3, 0, 0))
+                    local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        local tween = TweenService:Create(hrp, TweenInfo.new(0.15, Enum.EasingStyle.Linear), {
+                            CFrame = targetHRP.CFrame + Vector3.new(3, 0, 0)
+                        })
+                        tween:Play()
+                        tween.Completed:Wait()
+                    end
                 end
                 task.wait(0.1)
 
-                -- Equip + gift
-                local char = player.Character or player.CharacterAdded:Wait()
-                local humanoid = char:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    humanoid:EquipTool(brainrotTools[1])
-                    task.wait(0.2)
-                end
-
-                RS.Remotes.RequestGiftBrainrot:FireServer(target.UserId)
-                print("Gifted to:", target.Name, "| Sisa:", #brainrotTools - 1)
+                equipTool(tools[1])
+                GiftRemote:FireServer(target.UserId)
+                gifted = gifted + 1
                 task.wait(0.5)
             end
+
+            -- STEP 6: Lanjut deposit lagi (loop ulang otomatis)
         end)
     end
 end)()
