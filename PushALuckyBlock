@@ -1,0 +1,663 @@
+local TweenService      = game:GetService("TweenService")
+local Players           = game:GetService("Players")
+local UserInputService  = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer       = Players.LocalPlayer
+local player            = LocalPlayer
+local RS                = ReplicatedStorage
+
+-- ========================
+-- REMOTES
+-- ========================
+local gf = RS:WaitForChild("shared/network@GlobalFunctions", 15)
+task.wait(3)
+local requestRemote = gf:FindFirstChild("request")
+local upgradeBase   = gf:FindFirstChild("upgradeBase")
+print("✓ Remotes loaded!")
+
+-- ========================
+-- STATE
+-- ========================
+local State = {
+    AutoCollectCash = false,
+    AutoX2Train     = false,
+    AutoRebirth     = false,
+    AutoTP_x4       = false,
+    AutoTP_x2       = false,
+    AutoTP_x15      = false,
+    AutoUpgradeBase = false,
+    isDragging      = false,
+    dragStart       = nil,
+    startPos        = nil,
+    isAnimating     = false,
+}
+
+local barbellEquipped = false
+
+-- ========================
+-- HELPERS
+-- ========================
+local function getHRP()
+    local char = player.Character
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart")
+end
+
+local function getMyPlot()
+    local Plots = workspace:WaitForChild("Plots", 10)
+    if not Plots then return nil end
+    local attempts = 0
+    while #Plots:GetChildren() == 0 and attempts < 20 do
+        task.wait(0.5)
+        attempts += 1
+    end
+    for _, plot in ipairs(Plots:GetChildren()) do
+        local ownerAttr = plot:GetAttribute("Owner")
+        if ownerAttr == player.Name or ownerAttr == tostring(player.UserId) then
+            return plot
+        end
+    end
+    for _, plot in ipairs(Plots:GetChildren()) do
+        for _, desc in ipairs(plot:GetDescendants()) do
+            if desc:IsA("TextLabel") and desc.Text == player.Name then
+                return plot
+            end
+        end
+    end
+    return Plots:GetChildren()[1]
+end
+
+local cachedPlot, cachedStands = nil, nil
+
+local function refreshPlotCache()
+    cachedPlot, cachedStands = nil, nil
+    local plot = getMyPlot()
+    if not plot then return false end
+    local stands = plot:FindFirstChild("Stands")
+    if not stands then return false end
+    cachedPlot, cachedStands = plot, stands
+    return true
+end
+
+-- ========================
+-- COLLECT CASH
+-- ========================
+local function collectCash()
+    local hrp = getHRP()
+    if not hrp then return end
+    if not cachedPlot or not cachedPlot.Parent or not cachedStands or not cachedStands.Parent then
+        if not refreshPlotCache() then return end
+    end
+    for _, stand in ipairs(cachedStands:GetChildren()) do
+        local pad = stand:FindFirstChild("CollectPadHitbox")
+        if pad and pad.Parent then
+            pcall(function()
+                firetouchinterest(hrp, pad, 0)
+                firetouchinterest(hrp, pad, 1)
+            end)
+        end
+    end
+end
+
+-- ========================
+-- AUTO X2 TRAIN
+-- ========================
+local function equipBarbell()
+    if barbellEquipped then return end
+    local backpack = player:FindFirstChild("Backpack")
+    if not backpack then return end
+    for _, tool in ipairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool.Name:lower():find("barbell") then
+            local humanoid = player.Character and player.Character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid:EquipTool(tool)
+                barbellEquipped = true
+            end
+            return
+        end
+    end
+end
+
+local function clickBonusButton()
+    for _, gui in ipairs(player.PlayerGui:GetDescendants()) do
+        if gui:IsA("ImageButton") and gui.Name == "bonus-button" and gui.Visible then
+            pcall(function() firesignal(gui.MouseButton1Click) end)
+            pcall(function() firesignal(gui.Activated) end)
+        end
+    end
+end
+
+-- ========================
+-- AUTO TP
+-- ========================
+local function findZoneByMult(mult)
+    local best, bestMult = nil, 0
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj.Name == "BonusPowerZone" and obj:IsA("BasePart") then
+            local m = obj:GetAttribute("multiplier") or 0
+            if m == mult then return obj end
+            if m > bestMult then best = obj; bestMult = m end
+        end
+    end
+    return best
+end
+
+local function doTP(mult)
+    local hrp = getHRP()
+    if not hrp then return end
+    local zone = findZoneByMult(mult)
+    if not zone or not zone.Parent then return end
+    if (hrp.Position - zone.Position).Magnitude > 8 then
+        hrp.CFrame = CFrame.new(zone.Position + Vector3.new(0, 5, 0))
+    end
+end
+
+-- ========================
+-- AUTO REBIRTH
+-- ========================
+local rebirthRunning = false
+local function tryAutoRebirth()
+    if rebirthRunning then return end
+    if not requestRemote then return end
+    rebirthRunning = true
+    pcall(function() requestRemote:FireServer() end)
+    task.wait(0.1)
+    rebirthRunning = false
+end
+
+-- ========================
+-- AUTO UPGRADE BASE
+-- ========================
+local function doUpgradeBase()
+    if not upgradeBase then return end
+    pcall(function() upgradeBase:FireServer() end)
+end
+
+-- ========================
+-- CHARACTER ADDED
+-- ========================
+player.CharacterAdded:Connect(function()
+    cachedPlot, cachedStands, barbellEquipped = nil, nil, false
+    task.spawn(function() task.wait(3); refreshPlotCache() end)
+end)
+task.spawn(function() task.wait(3); refreshPlotCache() end)
+
+-- ========================
+-- LOOPS
+-- ========================
+task.spawn(function()
+    while true do
+        if State.AutoCollectCash then pcall(collectCash) end
+        task.wait(0.2)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if State.AutoX2Train then
+            if not barbellEquipped then pcall(equipBarbell); task.wait(0.5) end
+            pcall(clickBonusButton)
+        else
+            barbellEquipped = false
+        end
+        task.wait(0.1)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if State.AutoTP_x4 then pcall(doTP, 4)
+        elseif State.AutoTP_x2 then pcall(doTP, 2)
+        elseif State.AutoTP_x15 then pcall(doTP, 1.5)
+        end
+        task.wait(0.05)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if State.AutoRebirth then pcall(tryAutoRebirth) end
+        task.wait(0.1)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if State.AutoUpgradeBase then pcall(doUpgradeBase) end
+        task.wait(0.3)
+    end
+end)
+
+-- ========================
+-- GUI ROOT
+-- ========================
+if game.CoreGui:FindFirstChild("RilzzHub") then
+    game.CoreGui.RilzzHub:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "RilzzHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game.CoreGui
+
+-- ========================
+-- MAIN FRAME
+-- ========================
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 580, 0, 370)
+MainFrame.Position = UDim2.new(0.5, -290, 0.5, -185)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+MainFrame.BackgroundTransparency = 0.15
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 14)
+
+-- ========================
+-- MINI WIDGET (asset 1)
+-- ========================
+local MiniWidget = Instance.new("TextButton")
+MiniWidget.Name = "MiniWidget"
+MiniWidget.Size = UDim2.new(0, 42, 0, 42)
+MiniWidget.Position = UDim2.new(0, 25, 1, -70)
+MiniWidget.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+MiniWidget.Text = ""
+MiniWidget.Visible = false
+MiniWidget.Parent = ScreenGui
+Instance.new("UICorner", MiniWidget).CornerRadius = UDim.new(1, 0)
+local miniStroke = Instance.new("UIStroke", MiniWidget)
+miniStroke.Thickness = 1.8
+miniStroke.Color = Color3.fromRGB(255, 40, 70)
+miniStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+local miniImg = Instance.new("ImageLabel", MiniWidget)
+miniImg.Size = UDim2.new(1, 0, 1, 0)
+miniImg.Position = UDim2.new(0, 0, 0, 0)
+miniImg.BackgroundTransparency = 1
+miniImg.Image = "rbxassetid://81773253114107"
+miniImg.ScaleType = Enum.ScaleType.Fit
+miniImg.ZIndex = 2
+Instance.new("UICorner", miniImg).CornerRadius = UDim.new(1, 0)
+
+-- ========================
+-- TOP BAR
+-- ========================
+local TopBar = Instance.new("Frame")
+TopBar.Name = "TopBar"
+TopBar.Size = UDim2.new(1, 0, 0, 45)
+TopBar.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+TopBar.BackgroundTransparency = 0.2
+TopBar.BorderSizePixel = 0
+TopBar.ZIndex = 5
+TopBar.Parent = MainFrame
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 14)
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(0, 250, 0, 22)
+TitleLabel.Position = UDim2.new(0, 15, 0, 4)
+TitleLabel.Text = "<b>Rilzz Hub</b>"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 15
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.RichText = true
+TitleLabel.ZIndex = 6
+TitleLabel.Parent = TopBar
+
+local SubLabel = Instance.new("TextLabel")
+SubLabel.Size = UDim2.new(0, 250, 0, 15)
+SubLabel.Position = UDim2.new(0, 15, 0, 24)
+SubLabel.Text = "Push a Lucky Block"
+SubLabel.TextColor3 = Color3.fromRGB(140, 140, 160)
+SubLabel.Font = Enum.Font.GothamMedium
+SubLabel.TextSize = 11
+SubLabel.TextXAlignment = Enum.TextXAlignment.Left
+SubLabel.BackgroundTransparency = 1
+SubLabel.ZIndex = 6
+SubLabel.Parent = TopBar
+
+local PingLabel = Instance.new("TextLabel")
+PingLabel.Size = UDim2.new(0, 85, 0, 24)
+PingLabel.Position = UDim2.new(1, -165, 0, 10)
+PingLabel.BackgroundColor3 = Color3.fromRGB(255, 40, 70)
+PingLabel.Text = "Ping: --ms"
+PingLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+PingLabel.Font = Enum.Font.GothamBold
+PingLabel.TextSize = 11
+PingLabel.ZIndex = 6
+PingLabel.Parent = TopBar
+Instance.new("UICorner", PingLabel).CornerRadius = UDim.new(0, 12)
+
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 25, 0, 25)
+MinBtn.Position = UDim2.new(1, -65, 0, 10)
+MinBtn.BackgroundTransparency = 1
+MinBtn.Text = "––"
+MinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextSize = 14
+MinBtn.ZIndex = 6
+MinBtn.Parent = TopBar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 25, 0, 25)
+CloseBtn.Position = UDim2.new(1, -35, 0, 10)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 40, 70)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 16
+CloseBtn.ZIndex = 6
+CloseBtn.Parent = TopBar
+
+-- ========================
+-- PANELS
+-- ========================
+local LeftPanel = Instance.new("Frame")
+LeftPanel.Size = UDim2.new(0, 160, 1, -45)
+LeftPanel.Position = UDim2.new(0, 0, 0, 45)
+LeftPanel.BackgroundTransparency = 1
+LeftPanel.ZIndex = 3
+LeftPanel.Parent = MainFrame
+
+local Divider = Instance.new("Frame")
+Divider.Size = UDim2.new(0, 1, 1, -45)
+Divider.Position = UDim2.new(0, 160, 0, 45)
+Divider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Divider.BackgroundTransparency = 0.94
+Divider.BorderSizePixel = 0
+Divider.ZIndex = 3
+Divider.Parent = MainFrame
+
+local RightPanel = Instance.new("Frame")
+RightPanel.Size = UDim2.new(1, -161, 1, -45)
+RightPanel.Position = UDim2.new(0, 161, 0, 45)
+RightPanel.BackgroundTransparency = 1
+RightPanel.ZIndex = 2
+RightPanel.Parent = MainFrame
+
+-- ========================
+-- ANIME IMAGE (asset 2)
+-- ========================
+local AnimeImage = Instance.new("ImageLabel")
+AnimeImage.Size = UDim2.new(1, -20, 0, 180)
+AnimeImage.Position = UDim2.new(0, 10, 1, -190)
+AnimeImage.BackgroundTransparency = 1
+AnimeImage.Image = "rbxassetid://140107324186688"
+AnimeImage.ScaleType = Enum.ScaleType.Crop
+AnimeImage.ZIndex = 1
+AnimeImage.Parent = RightPanel
+Instance.new("UICorner", AnimeImage).CornerRadius = UDim.new(0, 8)
+
+-- ========================
+-- TAB SYSTEM
+-- ========================
+local tabs = {}
+local contents = {}
+local activeTab = nil
+
+local function makeTab(name, yPos)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -20, 0, 36)
+    btn.Position = UDim2.new(0, 10, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.ZIndex = 4
+    btn.Parent = LeftPanel
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
+    local lbl = Instance.new("TextLabel", btn)
+    lbl.Size = UDim2.new(1, -20, 1, 0)
+    lbl.Position = UDim2.new(0, 15, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = name
+    lbl.TextColor3 = Color3.fromRGB(160, 160, 170)
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 5
+
+    local bar = Instance.new("Frame", btn)
+    bar.Size = UDim2.new(0, 3, 1, -14)
+    bar.Position = UDim2.new(0, 2, 0, 7)
+    bar.BackgroundColor3 = Color3.fromRGB(255, 40, 70)
+    bar.BackgroundTransparency = 1
+    bar.BorderSizePixel = 0
+    bar.ZIndex = 5
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
+
+    return btn, lbl, bar
+end
+
+local function selectTab(name)
+    if activeTab == name then return end
+    activeTab = name
+    for n, data in pairs(tabs) do
+        local isActive = (n == name)
+        data.btn.BackgroundTransparency = isActive and 0.4 or 1
+        data.lbl.TextColor3 = isActive and Color3.fromRGB(255,255,255) or Color3.fromRGB(160,160,170)
+        data.bar.BackgroundTransparency = isActive and 0 or 1
+    end
+    for n, content in pairs(contents) do
+        content.Visible = (n == name)
+    end
+end
+
+local btnFarm, lblFarm, barFarm = makeTab("Farm",    12)
+local btnTP,   lblTP,   barTP   = makeTab("Auto TP", 53)
+
+tabs["Farm"]    = {btn=btnFarm, lbl=lblFarm, bar=barFarm}
+tabs["Auto TP"] = {btn=btnTP,   lbl=lblTP,   bar=barTP}
+
+-- ========================
+-- UI HELPERS
+-- ========================
+local function makeSwitch(parent, label, yPos, callback)
+    local container = Instance.new("Frame", parent)
+    container.Size = UDim2.new(1, -30, 0, 46)
+    container.Position = UDim2.new(0, 15, 0, yPos)
+    container.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+    container.BackgroundTransparency = 0.4
+    container.ZIndex = 4
+    Instance.new("UICorner", container).CornerRadius = UDim.new(0, 10)
+
+    local lbl = Instance.new("TextLabel", container)
+    lbl.Size = UDim2.new(0, 200, 1, 0)
+    lbl.Position = UDim2.new(0, 15, 0, 0)
+    lbl.Text = label
+    lbl.TextColor3 = Color3.fromRGB(240, 240, 245)
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 14
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.BackgroundTransparency = 1
+    lbl.ZIndex = 5
+
+    local switchBg = Instance.new("TextButton", container)
+    switchBg.Size = UDim2.new(0, 48, 0, 26)
+    switchBg.Position = UDim2.new(1, -63, 0.5, -13)
+    switchBg.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    switchBg.Text = ""
+    switchBg.ZIndex = 5
+    Instance.new("UICorner", switchBg).CornerRadius = UDim.new(1, 0)
+
+    local circle = Instance.new("Frame", switchBg)
+    circle.Size = UDim2.new(0, 20, 0, 20)
+    circle.Position = UDim2.new(0, 3, 0.5, -10)
+    circle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    circle.ZIndex = 6
+    Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
+
+    local on = false
+    switchBg.MouseButton1Click:Connect(function()
+        on = not on
+        TweenService:Create(circle, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            Position = on and UDim2.new(1, -23, 0.5, -10) or UDim2.new(0, 3, 0.5, -10)
+        }):Play()
+        TweenService:Create(switchBg, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            BackgroundColor3 = on and Color3.fromRGB(52, 199, 89) or Color3.fromRGB(45, 45, 55)
+        }):Play()
+        callback(on)
+    end)
+end
+
+local function makeSection(parent, text, yPos)
+    local lbl = Instance.new("TextLabel", parent)
+    lbl.Size = UDim2.new(1, -30, 0, 18)
+    lbl.Position = UDim2.new(0, 15, 0, yPos)
+    lbl.Text = text
+    lbl.TextColor3 = Color3.fromRGB(255, 40, 70)
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 10
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.BackgroundTransparency = 1
+    lbl.ZIndex = 4
+end
+
+-- ========================
+-- CONTENT: FARM
+-- ========================
+local ContentFarm = Instance.new("Frame", RightPanel)
+ContentFarm.Size = UDim2.new(1, -20, 1, -20)
+ContentFarm.Position = UDim2.new(0, 10, 0, 10)
+ContentFarm.BackgroundTransparency = 1
+ContentFarm.Visible = true
+ContentFarm.ZIndex = 3
+contents["Farm"] = ContentFarm
+
+makeSection(ContentFarm, "AUTO FARM", 5)
+makeSwitch(ContentFarm, "Auto Collect Cash", 26, function(v) State.AutoCollectCash = v end)
+makeSwitch(ContentFarm, "Auto X2 Train",     80, function(v)
+    State.AutoX2Train = v
+    if not v then barbellEquipped = false end
+end)
+
+makeSection(ContentFarm, "UPGRADE & REBIRTH", 135)
+makeSwitch(ContentFarm, "Auto Upgrade Base", 156, function(v) State.AutoUpgradeBase = v end)
+makeSwitch(ContentFarm, "Auto Rebirth",      210, function(v) State.AutoRebirth = v end)
+
+-- ========================
+-- CONTENT: AUTO TP
+-- ========================
+local ContentTP = Instance.new("Frame", RightPanel)
+ContentTP.Size = UDim2.new(1, -20, 1, -20)
+ContentTP.Position = UDim2.new(0, 10, 0, 10)
+ContentTP.BackgroundTransparency = 1
+ContentTP.Visible = false
+ContentTP.ZIndex = 3
+contents["Auto TP"] = ContentTP
+
+makeSection(ContentTP, "AUTO TP ZONE", 5)
+makeSwitch(ContentTP, "Auto TP x4",   26,  function(v) State.AutoTP_x4 = v end)
+makeSwitch(ContentTP, "Auto TP x2",   80,  function(v) State.AutoTP_x2 = v end)
+makeSwitch(ContentTP, "Auto TP x1.5", 134, function(v) State.AutoTP_x15 = v end)
+
+-- ========================
+-- TAB CLICK
+-- ========================
+for name, data in pairs(tabs) do
+    data.btn.MouseButton1Click:Connect(function() selectTab(name) end)
+end
+selectTab("Farm")
+
+-- ========================
+-- DRAG
+-- ========================
+TopBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        State.isDragging = true
+        State.dragStart  = input.Position
+        State.startPos   = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                State.isDragging = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if State.isDragging and (
+        input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch
+    ) then
+        local delta = input.Position - State.dragStart
+        MainFrame.Position = UDim2.new(
+            State.startPos.X.Scale, State.startPos.X.Offset + delta.X,
+            State.startPos.Y.Scale, State.startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- ========================
+-- MINIMIZE / RESTORE
+-- ========================
+MinBtn.MouseButton1Click:Connect(function()
+    if State.isAnimating then return end
+    State.isAnimating = true
+    local savedSize = MainFrame.Size
+    local savedPos  = MainFrame.Position
+    TweenService:Create(MainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = MiniWidget.Position
+    }):Play()
+    task.wait(0.3)
+    MainFrame.Visible = false
+    MiniWidget.Visible = true
+    MiniWidget.Size = UDim2.new(0, 0, 0, 0)
+    TweenService:Create(MiniWidget, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 42, 0, 42)
+    }):Play()
+    task.wait(0.3)
+    State.isAnimating = false
+    MainFrame.Size = savedSize
+    MainFrame.Position = savedPos
+end)
+
+MiniWidget.MouseButton1Click:Connect(function()
+    if State.isAnimating then return end
+    State.isAnimating = true
+    TweenService:Create(MiniWidget, TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0)
+    }):Play()
+    task.wait(0.15)
+    MiniWidget.Visible = false
+    MainFrame.Visible = true
+    local targetSize = MainFrame.Size
+    local targetPos  = MainFrame.Position
+    MainFrame.Size = UDim2.new(0, 0, 0, 0)
+    MainFrame.Position = MiniWidget.Position
+    TweenService:Create(MainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = targetSize,
+        Position = targetPos
+    }):Play()
+    task.wait(0.4)
+    State.isAnimating = false
+end)
+
+-- ========================
+-- CLOSE
+-- ========================
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- ========================
+-- PING UPDATER
+-- ========================
+task.spawn(function()
+    while ScreenGui.Parent do
+        local ok, ping = pcall(function()
+            return math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+        end)
+        if ok then
+            PingLabel.Text = "Ping: " .. ping .. "ms"
+            PingLabel.BackgroundColor3 = ping < 100 and Color3.fromRGB(40, 180, 80)
+                or ping < 200 and Color3.fromRGB(220, 140, 0)
+                or Color3.fromRGB(255, 40, 70)
+        end
+        task.wait(2)
+    end
+end)
