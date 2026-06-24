@@ -26,6 +26,7 @@ local State = {
     AutoTP_x2       = false,
     AutoTP_x15      = false,
     AutoUpgradeBase = false,
+    AutoBrainrot    = false,
     isDragging      = false,
     dragStart       = nil,
     startPos        = nil,
@@ -174,6 +175,84 @@ local function doUpgradeBase()
 end
 
 -- ========================
+-- AUTO PUSH (BRAINROT)
+-- ========================
+local function waitPushProgressCycle(timeout)
+    local t = tick()
+    while not player:GetAttribute("push-in-progress") do
+        if tick() - t > timeout then return false end
+        task.wait(0.05)
+    end
+    t = tick()
+    while player:GetAttribute("push-in-progress") do
+        if tick() - t > timeout then return false end
+        task.wait(0.05)
+    end
+    return true
+end
+
+local function waitPushZoneCycle(timeout)
+    local t = tick()
+    while not player:GetAttribute("push-zone") do
+        if tick() - t > timeout then return false end
+        task.wait(0.05)
+    end
+    t = tick()
+    while player:GetAttribute("push-zone") do
+        if tick() - t > timeout then return false end
+        task.wait(0.05)
+    end
+    return true
+end
+
+local function doBrainrot()
+    local hrp = getHRP()
+    if not hrp then return end
+
+    local map = workspace:FindFirstChild("Map")
+    if not map then return end
+    local pushZoneFolder = map:FindFirstChild("PushZone")
+    if not pushZoneFolder then return end
+    local pushZone = pushZoneFolder:FindFirstChild("Ground") or pushZoneFolder:FindFirstChild("PushZoneText")
+    if not pushZone then return end
+
+    -- Reset state
+    player:SetAttribute("push-requested", false)
+    player:SetAttribute("push-confirmed", false)
+
+    -- TP ke zone
+    hrp.CFrame = CFrame.new(pushZone.Position + Vector3.new(0, 5, 0))
+    task.wait(0.3)
+
+    -- Push request ON
+    player:SetAttribute("push-requested", true)
+    task.wait(0.08)
+
+    -- Push confirm ON
+    player:SetAttribute("push-confirmed", true)
+    task.wait(0.08)
+
+    -- Push request OFF
+    player:SetAttribute("push-requested", false)
+    task.wait(0.08)
+
+    -- Click 10x
+    for i = 1, 10 do
+        pcall(function() mouse1click() end)
+        task.wait(0.05)
+    end
+
+    -- Wait push-in-progress cycle
+    if not waitPushProgressCycle(15) then return end
+
+    -- Wait push-zone cycle
+    if not waitPushZoneCycle(20) then return end
+
+    -- Reset
+    player:SetAttribute("push-confirmed", false)
+end
+
+-- ========================
 -- CHARACTER ADDED
 -- ========================
 player.CharacterAdded:Connect(function()
@@ -228,6 +307,13 @@ task.spawn(function()
     end
 end)
 
+task.spawn(function()
+    while true do
+        if State.AutoBrainrot then pcall(doBrainrot) end
+        task.wait(0.5)
+    end
+end)
+
 -- ========================
 -- GUI ROOT
 -- ========================
@@ -255,7 +341,7 @@ MainFrame.Parent = ScreenGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 14)
 
 -- ========================
--- MINI WIDGET (asset 1)
+-- MINI WIDGET
 -- ========================
 local MiniWidget = Instance.new("TextButton")
 MiniWidget.Name = "MiniWidget"
@@ -378,7 +464,7 @@ RightPanel.ZIndex = 2
 RightPanel.Parent = MainFrame
 
 -- ========================
--- ANIME IMAGE (asset 2)
+-- ANIME IMAGE
 -- ========================
 local AnimeImage = Instance.new("ImageLabel")
 AnimeImage.Size = UDim2.new(1, -20, 0, 180)
@@ -536,6 +622,9 @@ end)
 makeSection(ContentFarm, "UPGRADE & REBIRTH", 135)
 makeSwitch(ContentFarm, "Auto Upgrade Base", 156, function(v) State.AutoUpgradeBase = v end)
 makeSwitch(ContentFarm, "Auto Rebirth",      210, function(v) State.AutoRebirth = v end)
+
+makeSection(ContentFarm, "PUSH", 265)
+makeSwitch(ContentFarm, "Auto Brainrot",     286, function(v) State.AutoBrainrot = v end)
 
 -- ========================
 -- CONTENT: AUTO TP
