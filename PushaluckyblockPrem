@@ -9,42 +9,43 @@ local RS                = ReplicatedStorage
 -- ========================
 -- REMOTES
 -- ========================
-local gf = RS:WaitForChild("shared/network@GlobalFunctions", 15)
+local gf            = RS:WaitForChild("shared/network@GlobalFunctions", 15)
+local ge            = RS:WaitForChild("shared/network@GlobalEvents", 15)
 task.wait(3)
 local requestRemote = gf:FindFirstChild("request")
 local upgradeBase   = gf:FindFirstChild("upgradeBase")
-
-local function getReachedEnd()
-    for _, v in ipairs(RS:GetDescendants()) do
-        if v.Name == "reachedEnd" and v:IsA("RemoteEvent") then
-            return v
-        end
-    end
-    return nil
-end
-local reachedEnd = getReachedEnd()
+local beginRemote   = gf:FindFirstChild("begin")
+local reachedEnd    = ge and ge:FindFirstChild("reachedEnd")
 print("✓ Remotes loaded!")
+
+-- ========================
+-- CONFIG PUSH
+-- ========================
+local START_POS     = Vector3.new(-1.0, 8.2, 69.4)
+local END_POS       = Vector3.new(-4.2, 525.9, 2027.3)
+local ATTR_PROGRESS = "push-in-progress"
+local ATTR_CONFIRM  = "push-confirmed"
+local ATTR_HATCH    = "hatch-anim-playing"
 
 -- ========================
 -- STATE
 -- ========================
 local State = {
-    AutoCollectCash = false,
-    AutoX2Train     = false,
-    AutoRebirth     = false,
-    AutoTP_x4       = false,
-    AutoTP_x2       = false,
-    AutoTP_x15      = false,
-    AutoUpgradeBase = false,
-    AutoBestLucky   = false,
-    isDragging      = false,
-    dragStart       = nil,
-    startPos        = nil,
-    isAnimating     = false,
+    AutoCollectCash    = false,
+    AutoX2Train        = false,
+    AutoRebirth        = false,
+    AutoTP_x4          = false,
+    AutoTP_x2          = false,
+    AutoTP_x15         = false,
+    AutoUpgradeBase    = false,
+    AutoFastGetBrainrot = false,
+    isDragging         = false,
+    dragStart          = nil,
+    startPos           = nil,
+    isAnimating        = false,
 }
 
 local barbellEquipped = false
-local clickActive     = false
 
 -- ========================
 -- HELPERS
@@ -53,6 +54,11 @@ local function getHRP()
     local char = player.Character
     if not char then return nil end
     return char:FindFirstChild("HumanoidRootPart")
+end
+
+local function tpTo(pos)
+    local hrp = getHRP()
+    if hrp then hrp.CFrame = CFrame.new(pos) end
 end
 
 local function getMyPlot()
@@ -186,86 +192,75 @@ local function doUpgradeBase()
 end
 
 -- ========================
--- AUTO BEST LUCKY
+-- AUTO FAST GET BRAINROT
+-- (7 loop paralel spam dari push_spam_fixed)
 -- ========================
-local function doBestLucky()
-    local hrp = getHRP()
-    if not hrp then return end
+local brainrotLoops = {}
 
-    local pushZoneFolder = workspace.Map.PushZone
-    local pushZoneGround = pushZoneFolder:FindFirstChild("Ground")
-    local pushZoneText   = pushZoneFolder:FindFirstChild("PushZoneText")
-    local pushZone       = pushZoneGround or pushZoneText
-    if not pushZone then return end
-
-    player:SetAttribute("push-in-progress", false)
-    player:SetAttribute("push-confirmed", false)
-    player:SetAttribute("push-requested", false)
-    task.wait(0.2)
-
-    hrp.CFrame = CFrame.new(pushZone.Position + Vector3.new(0, 5, 0))
-    task.wait(0.3)
-
-    player:SetAttribute("push-requested", true)
-    task.wait(0.1)
-    player:SetAttribute("push-requested", false)
-    task.wait(0.1)
-
-    player:SetAttribute("push-confirmed", true)
-    task.wait(0.3)
-
-    clickActive = true
-
-    local timeout = tick()
-    while not player:GetAttribute("push-in-progress") do
-        if tick() - timeout > 10 then
-            clickActive = false
-            return
+local function startBrainrotLoops()
+    -- Loop 1: Spam TP Start
+    brainrotLoops[1] = task.spawn(function()
+        while State.AutoFastGetBrainrot do
+            pcall(tpTo, START_POS)
+            task.wait()
         end
-        pcall(function() firetouchinterest(hrp, pushZone, 0) end)
-        pcall(function() firetouchinterest(hrp, pushZone, 1) end)
-        if pushZoneGround then
-            pcall(function() firetouchinterest(hrp, pushZoneGround, 0) end)
-            pcall(function() firetouchinterest(hrp, pushZoneGround, 1) end)
+    end)
+
+    -- Loop 2: Spam Progress toggle
+    brainrotLoops[2] = task.spawn(function()
+        local s = true
+        while State.AutoFastGetBrainrot do
+            pcall(function() player:SetAttribute(ATTR_PROGRESS, s) end)
+            s = not s
+            task.wait()
         end
-        for _, v in ipairs(pushZoneFolder:GetDescendants()) do
-            if v:IsA("BasePart") then
-                pcall(function() firetouchinterest(hrp, v, 0) end)
-                pcall(function() firetouchinterest(hrp, v, 1) end)
+    end)
+
+    -- Loop 3: Spam Confirm toggle
+    brainrotLoops[3] = task.spawn(function()
+        local s = true
+        while State.AutoFastGetBrainrot do
+            pcall(function() player:SetAttribute(ATTR_CONFIRM, s) end)
+            s = not s
+            task.wait()
+        end
+    end)
+
+    -- Loop 4: Spam Begin remote
+    brainrotLoops[4] = task.spawn(function()
+        while State.AutoFastGetBrainrot do
+            if beginRemote then
+                pcall(function() beginRemote:FireServer(0, 1) end)
             end
+            task.wait()
         end
-        task.wait(0.05)
-    end
+    end)
 
-    clickActive = false
-
-    for i = 1, 5 do
-        hrp = getHRP()
-        if hrp then
-            hrp.CFrame = CFrame.new(-6.6, 525.6, 2026.2)
+    -- Loop 5: Spam TP End
+    brainrotLoops[5] = task.spawn(function()
+        while State.AutoFastGetBrainrot do
+            pcall(tpTo, END_POS)
+            task.wait()
         end
-        task.wait(0.1)
-    end
+    end)
 
-    task.wait(1.5)
-
-    local waitTimeout = tick()
-    while player:GetAttribute("push-in-progress") do
-        if tick() - waitTimeout > 30 then return end
-        task.wait(0.2)
-    end
-
-    task.wait(1.5)
-
-    local spamTimeout = tick()
-    while not player:GetAttribute("push-zone") do
-        if tick() - spamTimeout > 15 then break end
-        hrp = getHRP()
-        if hrp then
-            hrp.CFrame = CFrame.new(pushZone.Position + Vector3.new(0, 5, 0))
+    -- Loop 6: Spam ReachedEnd remote
+    brainrotLoops[6] = task.spawn(function()
+        while State.AutoFastGetBrainrot do
+            if reachedEnd then
+                pcall(function() reachedEnd:FireServer() end)
+            end
+            task.wait()
         end
-        task.wait(0.01)
-    end
+    end)
+
+    -- Loop 7: Spam Hatch Anim false
+    brainrotLoops[7] = task.spawn(function()
+        while State.AutoFastGetBrainrot do
+            pcall(function() player:SetAttribute(ATTR_HATCH, false) end)
+            task.wait()
+        end
+    end)
 end
 
 -- ========================
@@ -278,7 +273,7 @@ end)
 task.spawn(function() task.wait(3); refreshPlotCache() end)
 
 -- ========================
--- LOOPS
+-- LOOPS UTAMA
 -- ========================
 task.spawn(function()
     while true do
@@ -320,36 +315,6 @@ task.spawn(function()
     while true do
         if State.AutoUpgradeBase then pcall(doUpgradeBase) end
         task.wait(0.3)
-    end
-end)
-
--- Loop reachedEnd terus
-task.spawn(function()
-    while true do
-        if reachedEnd then
-            pcall(function() reachedEnd:FireServer() end)
-        end
-        task.wait(0.01)
-    end
-end)
-
--- Loop click
-task.spawn(function()
-    while true do
-        if clickActive then
-            pcall(function() mouse1click() end)
-        end
-        task.wait(0.02)
-    end
-end)
-
--- Loop best lucky
-task.spawn(function()
-    while true do
-        if State.AutoBestLucky then
-            pcall(doBestLucky)
-        end
-        task.wait(0.05)
     end
 end)
 
@@ -652,12 +617,17 @@ ContentFarm.ZIndex = 3
 contents["Farm"] = ContentFarm
 
 makeSection(ContentFarm, "AUTO FARM", 5)
-makeSwitch(ContentFarm, "Auto Collect Cash", 26, function(v) State.AutoCollectCash = v end)
-makeSwitch(ContentFarm, "Auto X2 Train",     80, function(v)
+makeSwitch(ContentFarm, "Auto Collect Cash",      26,  function(v) State.AutoCollectCash = v end)
+makeSwitch(ContentFarm, "Auto X2 Train",          80,  function(v)
     State.AutoX2Train = v
     if not v then barbellEquipped = false end
 end)
-makeSwitch(ContentFarm, "Auto Best Lucky",   134, function(v) State.AutoBestLucky = v end)
+makeSwitch(ContentFarm, "Auto Fast Get Brainrot", 134, function(v)
+    State.AutoFastGetBrainrot = v
+    if v then
+        task.spawn(startBrainrotLoops)
+    end
+end)
 
 makeSection(ContentFarm, "UPGRADE & REBIRTH", 189)
 makeSwitch(ContentFarm, "Auto Upgrade Base", 210, function(v) State.AutoUpgradeBase = v end)
