@@ -42,7 +42,6 @@ if gal1 then
         MoveSpeed       = 300
     }
 
-    -- Helper: safely resolve dropdown value (fixes "string expected, got table" error)
     local function resolveDropdown(v, default)
         if type(v) == "table" then
             for _, item in pairs(v) do return tostring(item) end
@@ -135,6 +134,13 @@ if gal1 then
         [81]   = "Sigma Boy",
         [82]   = "Sigma Girl",
         [83]   = "Dul Dul Dul",
+        [84]   = "Guerriro Digitale",
+        [85]   = "Job Job Job Sahur",
+        [86]   = "Girafa Celestre",
+        [87]   = "Fragola La La La",
+        [88]   = "Extinct Matteo",
+        [89]   = "Espresso Signora",
+        [90]   = "Gorillo Watermelondrillo",
         [2000] = "Pandaccini Bananini",
         [2001] = "Cocofanto Elefanto",
         [3001] = "SneakyTralalaeritos",
@@ -144,6 +150,11 @@ if gal1 then
         [3005] = "Tictac Sahur",
         [3006] = "PotHotspot",
         [3007] = "Gangster Footera",
+        [3008] = "Salamino Penguino",
+        [3009] = "Gattatino Nyanino",
+        [3010] = "Gattito Tacoto",
+        [3011] = "Graipuss Medussi",
+        [3012] = "Gattatino Neonino",
         [4001] = "Avocadini Guffo",
         [4002] = "Avocadini Antilopini",
         [4003] = "Avocadorilla",
@@ -490,8 +501,6 @@ if gal1 then
     -- ========================
     local Lib = loadstring(game:HttpGet("https://pastefy.app/TaC9quOO/raw"))()
 
-    -- Patch: library ini punya bug assign table ke TextLabel.Text
-    -- Override __newindex untuk semua TextLabel agar auto-convert ke string
     local origNewIndex = getrawmetatable and getrawmetatable(Instance.new("TextLabel")).__newindex
     if origNewIndex then
         local mt = getrawmetatable(Instance.new("TextLabel"))
@@ -512,12 +521,12 @@ if gal1 then
     end
 
     local Window = Lib:CreateWindow({
-        ["Title"]              = "Brainrot Sniper",
-        ["Icon"]               = "crown",
-        ["Author"]             = "Rilzz",
-        ["Folder"]             = "BrainrotSniper",
-        ["Size"]               = UDim2.fromOffset(528, 334),
-        ["FileSaveName"]       = "BrainrotSniper/Config.json"
+        ["Title"]        = "Brainrot Sniper",
+        ["Icon"]         = "crown",
+        ["Author"]       = "Rilzz",
+        ["Folder"]       = "BrainrotSniper",
+        ["Size"]         = UDim2.fromOffset(528, 334),
+        ["FileSaveName"] = "BrainrotSniper/Config.json"
     })
 
     local idOrder = {
@@ -525,7 +534,9 @@ if gal1 then
         21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,
         41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,
         61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,
-        81,82,83,2000,2001,3001,3002,3003,3004,3005,3006,3007,
+        81,82,83,84,85,86,87,88,89,90,
+        2000,2001,
+        3001,3002,3003,3004,3005,3006,3007,3008,3009,3010,3011,3012,
         4001,4002,4003,4004,4005
     }
 
@@ -550,11 +561,7 @@ if gal1 then
     local PadOptions = {"All"}
     for i = 1, 100 do PadOptions[#PadOptions + 1] = tostring(i) end
 
-    -- TAB MAIN
-    local TabMain = Window:Tab({
-        ["Title"] = "Main",
-        ["Icon"]  = "home"
-    })
+    local TabMain = Window:Tab({ ["Title"] = "Main", ["Icon"] = "home" })
 
     TabMain:Paragraph({
         ["Title"]       = "Brainrot Instant",
@@ -602,13 +609,11 @@ if gal1 then
         ["Callback"] = function(v)
             local val
             if type(v) == "table" then
-                local first = next(v)
-                val = first and tostring(first) or "All"
-                -- juga coba ambil value dari pasangan key-value
                 for k, vv in pairs(v) do
                     if type(vv) == "string" then val = vv break end
                     if type(k) == "string" then val = k break end
                 end
+                val = val or "All"
             else
                 val = tostring(v or "All")
             end
@@ -653,43 +658,26 @@ if gal1 then
         ["Description"] = "Auto farm cash, rebirth, sell, rewards"
     })
 
-    TabMain:Toggle({
-        ["Title"] = "Auto Cash", ["Default"] = false,
-        ["Callback"] = function(Value) gal43.AutoCash = Value end
-    })
-    TabMain:Toggle({
-        ["Title"] = "Auto Rebirth", ["Default"] = false,
-        ["Callback"] = function(Value) gal43.AutoRebirth = Value end
-    })
-    TabMain:Toggle({
-        ["Title"] = "Auto Sell", ["Default"] = false,
-        ["Callback"] = function(Value) gal43.AutoSell = Value end
-    })
-    TabMain:Toggle({
-        ["Title"] = "Auto Claim Rewards", ["Default"] = false,
-        ["Callback"] = function(Value) gal43.AutoRewards = Value end
-    })
+    TabMain:Toggle({ ["Title"] = "Auto Cash", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoCash = Value end })
+    TabMain:Toggle({ ["Title"] = "Auto Rebirth", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoRebirth = Value end })
+    TabMain:Toggle({ ["Title"] = "Auto Sell", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoSell = Value end })
+    TabMain:Toggle({ ["Title"] = "Auto Claim Rewards", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoRewards = Value end })
 
-    -- TAB UPGRADES
-    local TabUpgrade = Window:Tab({
-        ["Title"] = "Upgrades",
-        ["Icon"]  = "zap"
-    })
+    local TabUpgrade = Window:Tab({ ["Title"] = "Upgrades", ["Icon"] = "zap" })
 
     TabUpgrade:Paragraph({
         ["Title"]       = "Upgrades",
         ["Description"] = "Auto upgrade base, brainrot, sniper, drone, shield"
     })
 
-    TabUpgrade:Toggle({
-        ["Title"] = "Auto Upgrade Base", ["Default"] = false,
-        ["Callback"] = function(Value) gal43.AutoUpgradeBase = Value end
-    })
-
-    TabUpgrade:Toggle({
-        ["Title"] = "Auto Upgrade Brainrot", ["Default"] = false,
-        ["Callback"] = function(Value) gal43.AutoBrainrot = Value end
-    })
+    TabUpgrade:Toggle({ ["Title"] = "Auto Upgrade Base", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoUpgradeBase = Value end })
+    TabUpgrade:Toggle({ ["Title"] = "Auto Upgrade Brainrot", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoBrainrot = Value end })
 
     TabUpgrade:Dropdown({
         ["Title"]    = "Brainrot Pad",
@@ -700,10 +688,8 @@ if gal1 then
         end
     })
 
-    TabUpgrade:Toggle({
-        ["Title"] = "Auto Upgrade Sniper", ["Default"] = false,
-        ["Callback"] = function(Value) gal43.AutoSniper = Value end
-    })
+    TabUpgrade:Toggle({ ["Title"] = "Auto Upgrade Sniper", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoSniper = Value end })
 
     TabUpgrade:Dropdown({
         ["Title"]    = "Sniper Amount",
@@ -714,40 +700,22 @@ if gal1 then
         end
     })
 
-    TabUpgrade:Toggle({
-        ["Title"] = "Auto Buy Drone", ["Default"] = false,
-        ["Callback"] = function(Value) gal43.AutoDrone = Value end
-    })
-    TabUpgrade:Toggle({
-        ["Title"] = "Auto Buy Shield", ["Default"] = false,
-        ["Callback"] = function(Value) gal43.AutoShield = Value end
-    })
+    TabUpgrade:Toggle({ ["Title"] = "Auto Buy Drone", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoDrone = Value end })
+    TabUpgrade:Toggle({ ["Title"] = "Auto Buy Shield", ["Default"] = false,
+        ["Callback"] = function(Value) gal43.AutoShield = Value end })
 
-    -- TAB PLACE
-    local TabPlace = Window:Tab({
-        ["Title"] = "Place",
-        ["Icon"]  = "target"
-    })
+    local TabPlace = Window:Tab({ ["Title"] = "Place", ["Icon"] = "target" })
 
     TabPlace:Paragraph({
         ["Title"]       = "Actions",
         ["Description"] = "Aksi manual placement"
     })
 
-    TabPlace:Button({
-        ["Title"]    = "Place Once",
-        ["Callback"] = function() gal59() end
-    })
-    TabPlace:Button({
-        ["Title"]    = "Unequip All",
-        ["Callback"] = function() gal57() end
-    })
+    TabPlace:Button({ ["Title"] = "Place Once", ["Callback"] = function() gal59() end })
+    TabPlace:Button({ ["Title"] = "Unequip All", ["Callback"] = function() gal57() end })
 
-    -- TAB SETTINGS
-    local TabSettings = Window:Tab({
-        ["Title"] = "Settings",
-        ["Icon"]  = "settings"
-    })
+    local TabSettings = Window:Tab({ ["Title"] = "Settings", ["Icon"] = "settings" })
 
     TabSettings:Paragraph({
         ["Title"]       = "About",
@@ -756,9 +724,7 @@ if gal1 then
 
     TabSettings:Button({
         ["Title"]    = "Unload",
-        ["Callback"] = function()
-            pcall(function() Window:Destroy() end)
-        end
+        ["Callback"] = function() pcall(function() Window:Destroy() end) end
     })
 
     pcall(function()
