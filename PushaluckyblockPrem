@@ -22,7 +22,7 @@ print("✓ Remotes loaded!")
 -- CONFIG PUSH
 -- ========================
 local START_POS     = Vector3.new(-1.0, 8.2, 69.4)
-local END_POS       = Vector3.new(-4.2, 525.9, 2027.3)
+local END_POS       = Vector3.new(-2.1, 577.0, 2218.0)
 local ATTR_PROGRESS = "push-in-progress"
 local ATTR_CONFIRM  = "push-confirmed"
 local ATTR_HATCH    = "hatch-anim-playing"
