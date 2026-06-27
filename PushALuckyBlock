@@ -165,7 +165,7 @@ end
 -- AUTO BRAINROT
 -- Alur: begin → tween ke end pos → tunggu push-zone ON → tunggu push-zone OFF → loop
 -- ========================
-local BRAINROT_END    = Vector3.new(2.9,  524.7, 2022.9)
+local BRAINROT_END    = Vector3.new(-2.1, 577.0, 2218.0)
 local BRAINROT_RETURN = Vector3.new(0.7,   33.3,  189.0)
 
 local function doBrainrotLoop()
