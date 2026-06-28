@@ -1,0 +1,603 @@
+-- Rilz Hub
+-- Base URL: https://github.com/aaakjolaka299pp-wq/Gui
+
+local repo = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Gui/main/"
+
+local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+
+-- =============================================
+--  WINDOW
+-- =============================================
+local Window = Library:CreateWindow({
+    Title            = "Rilz Hub",
+    Footer           = "version: 3.0",
+    Icon             = 6031763489,
+    NotifySide       = "Right",
+    ShowCustomCursor = true,
+    AutoShow         = true,
+})
+
+-- =============================================
+--  TABS
+-- =============================================
+local Tabs = {
+    Main            = Window:AddTab("Main", "zap"),
+    World           = Window:AddTab("World", "globe"),
+    Buy             = Window:AddTab("Buy", "shopping-cart"),
+    ["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
+
+-- =============================================
+--  SERVICES
+-- =============================================
+local Players        = game:GetService("Players")
+local RS             = game:GetService("ReplicatedStorage")
+local Events         = RS:WaitForChild("Events")
+
+local player = Players.LocalPlayer
+
+-- =============================================
+--  LOOP HELPER
+-- =============================================
+local threads = {}
+
+local function startLoop(key, fn, getDelay)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+    threads[key] = task.spawn(function()
+        while Toggles[key] and Toggles[key].Value do
+            pcall(fn)
+            local d = getDelay and getDelay() or 0.5
+            if d <= 0 then task.wait() else task.wait(d) end
+        end
+    end)
+end
+
+local function stopLoop(key)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+end
+
+-- =============================================
+--  HELPERS
+-- =============================================
+local function getPlayerPlot()
+    return workspace:FindFirstChild("Plot_" .. player.Name)
+end
+
+local function findProximityPrompt()
+    local plot = getPlayerPlot()
+    if not plot then return nil end
+    for _, obj in ipairs(plot:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.ActionText == "Place Item" then
+            return obj
+        end
+    end
+    return nil
+end
+
+local function getToolFromBackpack()
+    local backpack = player:FindFirstChildOfClass("Backpack")
+    if backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name:lower() ~= "bat" then
+                return tool
+            end
+        end
+    end
+    local char = player.Character
+    if char then
+        for _, tool in ipairs(char:GetChildren()) do
+            if tool:IsA("Tool") and tool.Name:lower() ~= "bat" then
+                return tool
+            end
+        end
+    end
+    return nil
+end
+
+-- =============================================
+--  TAB: MAIN
+-- =============================================
+local MainLeft  = Tabs.Main:AddLeftGroupbox("Auto Dupe", "repeat")
+local MainRight = Tabs.Main:AddRightGroupbox("Farm", "coins")
+
+-- AUTO DUPE
+local placeItemRunning = false
+
+local function runPlaceItem()
+    while placeItemRunning do
+        local prompt = findProximityPrompt()
+        if not prompt then
+            Library:Notify({ Title = "Rilz Hub", Description = "Place Item habis, berhenti.", Time = 3 })
+            placeItemRunning = false
+            Toggles.AutoDupe:SetValue(false)
+            break
+        end
+
+        local char = player.Character
+        if not char then task.wait(0.5) continue end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then task.wait(0.5) continue end
+
+        local promptPart = prompt.Parent
+        local promptCFrame = promptPart:IsA("BasePart") and promptPart.CFrame or CFrame.new(promptPart.Position)
+        hrp.CFrame = promptCFrame * CFrame.new(0, 0, -3)
+        task.wait(0.1)
+
+        local tool = getToolFromBackpack()
+        if tool then
+            player.Character.Humanoid:EquipTool(tool)
+            task.wait(0.1)
+        end
+
+        char:FindFirstChildOfClass("Humanoid").Health = 0
+        task.wait(0.3)
+
+        local newChar = player.Character or player.CharacterAdded:Wait()
+        task.wait(0.2)
+
+        local freshPrompt = findProximityPrompt()
+        if not freshPrompt then
+            Library:Notify({ Title = "Rilz Hub", Description = "Place Item habis, berhenti.", Time = 3 })
+            placeItemRunning = false
+            Toggles.AutoDupe:SetValue(false)
+            break
+        end
+
+        local newHRP = newChar:WaitForChild("HumanoidRootPart", 5)
+        if not newHRP then task.wait(0.5) continue end
+
+        local fp = freshPrompt.Parent
+        local fpCFrame = fp:IsA("BasePart") and fp.CFrame or CFrame.new(fp.Position)
+        newHRP.CFrame = fpCFrame * CFrame.new(0, 0, -3)
+        task.wait(0.1)
+
+        local ok = pcall(fireproximityprompt, freshPrompt)
+        if not ok then pcall(function() freshPrompt.Triggered:Fire(player) end) end
+
+        task.wait(0.3)
+    end
+end
+
+MainLeft:AddToggle("AutoDupe", {
+    Text    = "Auto Dupe",
+    Default = false,
+    Tooltip = "Auto TP → Equip Tool → Reset → Trigger Place Item",
+    Callback = function(Value)
+        if Value then
+            placeItemRunning = true
+            task.spawn(runPlaceItem)
+            Library:Notify({ Title = "Rilz Hub", Description = "Auto Dupe dimulai!", Time = 2 })
+        else
+            placeItemRunning = false
+            Library:Notify({ Title = "Rilz Hub", Description = "Auto Dupe dihentikan.", Time = 2 })
+        end
+    end,
+})
+
+MainLeft:AddDivider()
+
+-- AUTO COLLECT CASH
+MainLeft:AddToggle("AutoCollectCash", {
+    Text    = "Auto Collect Cash",
+    Default = false,
+    Tooltip = "Auto collect cash dari semua slot & floor",
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoCollectCash", function()
+                local plot = getPlayerPlot()
+                if not plot then return end
+                local char = player.Character
+                if not char then return end
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if not hrp then return end
+                for floor = 1, 3 do
+                    local floorFolder = plot:FindFirstChild("Floor" .. floor)
+                    if floorFolder then
+                        local slots = floorFolder:FindFirstChild("Slots")
+                        if slots then
+                            for slot = 1, 10 do
+                                local slotFolder = slots:FindFirstChild("Slot" .. slot)
+                                if slotFolder and slotFolder:FindFirstChild("CollectTouch") then
+                                    pcall(firetouchinterest, hrp, slotFolder.CollectTouch, 0)
+                                    pcall(firetouchinterest, hrp, slotFolder.CollectTouch, 1)
+                                end
+                            end
+                        end
+                    end
+                end
+            end, function() return Options.CollectCashDelay.Value end)
+        else
+            stopLoop("AutoCollectCash")
+        end
+    end,
+})
+
+MainLeft:AddSlider("CollectCashDelay", {
+    Text = "Collect Cash Delay", Default = 0.5, Min = 0, Max = 1, Rounding = 1, Suffix = "s",
+})
+
+MainLeft:AddDivider()
+
+-- AUTO REQUEST REBIRTH
+MainLeft:AddToggle("AutoRequestRebirth", {
+    Text    = "Auto Request Rebirth",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoRequestRebirth", function()
+                Events:WaitForChild("RequestRebirth"):FireServer()
+            end, function() return Options.RebirthDelay.Value end)
+        else
+            stopLoop("AutoRequestRebirth")
+        end
+    end,
+})
+
+MainLeft:AddSlider("RebirthDelay", {
+    Text = "Rebirth Delay", Default = 1, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+MainLeft:AddDivider()
+
+-- SELL ALL
+MainLeft:AddButton({
+    Text    = "Sell All",
+    Tooltip = "Jual semua item di inventory",
+    Func    = function()
+        pcall(function()
+            Events:WaitForChild("RequestSell"):FireServer("Inventory")
+        end)
+        Library:Notify({ Title = "Rilz Hub", Description = "Sell All berhasil!", Time = 2 })
+    end,
+})
+
+-- TP BUTTONS (kanan)
+MainRight:AddButton({
+    Text = "TP to Safe Zone",
+    Tooltip = "Teleport ke Safe Zone (21.2, 53.7, 34.0)",
+    Func = function()
+        local char = player.Character
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then hrp.CFrame = CFrame.new(21.2, 53.7, 34.0) end
+        end
+    end,
+})
+
+MainRight:AddButton({
+    Text = "TP to Best Zone",
+    Tooltip = "Teleport ke Best Zone (3.3, 42.3, 2290.7)",
+    Func = function()
+        local char = player.Character
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then hrp.CFrame = CFrame.new(3.3, 42.3, 2290.7) end
+        end
+    end,
+})
+
+-- =============================================
+--  TAB: WORLD
+-- =============================================
+local WorldLeft  = Tabs.World:AddLeftGroupbox("World", "globe")
+local WorldRight = Tabs.World:AddRightGroupbox("Map", "map")
+
+-- CHANGE WORLD
+local worldMap = { Normal = 1, Candy = 2, Run = 3, Frozen = 4 }
+
+WorldLeft:AddDropdown("ChangeWorldSelector", {
+    Values  = { "Normal", "Candy", "Run", "Frozen" },
+    Default = 1,
+    Multi   = false,
+    Text    = "World",
+    Tooltip = "Pilih world tujuan",
+})
+
+WorldLeft:AddToggle("AutoChangeWorld", {
+    Text    = "Change World",
+    Default = false,
+    Tooltip = "Auto pindah ke world yang dipilih",
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoChangeWorld", function()
+                local selected = Options.ChangeWorldSelector.Value
+                local id = worldMap[selected] or 1
+                Events:WaitForChild("ChangeWorld"):FireServer(id)
+            end, function() return Options.ChangeWorldDelay.Value end)
+        else
+            stopLoop("AutoChangeWorld")
+        end
+    end,
+})
+
+WorldLeft:AddSlider("ChangeWorldDelay", {
+    Text = "Change World Delay", Default = 0.5, Min = 0, Max = 1, Rounding = 1, Suffix = "s",
+})
+
+WorldLeft:AddDivider()
+
+-- AUTO INSTANT CLAIM
+local claimMap = { Normal = "MapNormal", Candy = "MapCandy", Run = "MapRun", Frozen = "MapFrozen" }
+
+WorldLeft:AddDropdown("InstantClaimSelector", {
+    Values  = { "Normal", "Candy", "Run", "Frozen" },
+    Default = 1,
+    Multi   = false,
+    Text    = "Claim Mode",
+    Tooltip = "Pilih mode instant claim",
+})
+
+WorldLeft:AddToggle("AutoInstantClaim", {
+    Text    = "Auto Instant Claim",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoInstantClaim", function()
+                local selected = Options.InstantClaimSelector.Value
+                local mode = claimMap[selected] or "MapNormal"
+                Events:WaitForChild("AskMapModifier"):FireServer(mode)
+            end, function() return Options.InstantClaimDelay.Value end)
+        else
+            stopLoop("AutoInstantClaim")
+        end
+    end,
+})
+
+WorldLeft:AddSlider("InstantClaimDelay", {
+    Text = "Instant Claim Delay", Default = 0.5, Min = 0, Max = 1, Rounding = 1, Suffix = "s",
+})
+
+-- MAP (kanan)
+WorldRight:AddButton({
+    Text    = "Instant Unlock Next Map",
+    Tooltip = "Unlock map berikutnya sekarang",
+    Func    = function()
+        pcall(function()
+            Events:WaitForChild("UnlockNextMap"):FireServer()
+        end)
+        Library:Notify({ Title = "Rilz Hub", Description = "Unlock Next Map berhasil!", Time = 2 })
+    end,
+})
+
+-- =============================================
+--  TAB: BUY
+-- =============================================
+local BuyLeft  = Tabs.Buy:AddLeftGroupbox("Tool & Carry", "sword")
+local BuyRight = Tabs.Buy:AddRightGroupbox("Speed & Upgrade", "trending-up")
+
+-- AUTO BUY TOOL
+BuyLeft:AddDropdown("BuyToolSelector", {
+    Values = {
+        "Slapper",
+        "Frying Pan",
+        "Ice Slapper",
+        "Lava Slapper",
+        "Neon Slapper",
+        "Void Slapper",
+        "Rainbow Slapper",
+        "Taser Gun",
+        "Banana Peel",
+        "Evolved Hammer",
+        "8 Bit Sword",
+        "Rainbow Sword",
+        "Lightsaber",
+        "Invisibility Cloak",
+        "Body Swap Potion",
+        "Laser Gun",
+    },
+    Default    = 1,
+    Multi      = false,
+    Text       = "Tool",
+    Searchable = true,
+    Tooltip    = "Pilih tool yang mau dibeli",
+})
+
+BuyLeft:AddToggle("AutoBuyTool", {
+    Text    = "Auto Buy Tool",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoBuyTool", function()
+                local tool = Options.BuyToolSelector.Value
+                Events:WaitForChild("PurchaseTool"):FireServer(tool, "Money")
+            end, function() return Options.BuyToolDelay.Value end)
+        else
+            stopLoop("AutoBuyTool")
+        end
+    end,
+})
+
+BuyLeft:AddSlider("BuyToolDelay", {
+    Text = "Buy Tool Delay", Default = 0.5, Min = 0, Max = 1, Rounding = 1, Suffix = "s",
+})
+
+BuyLeft:AddDivider()
+
+-- AUTO PURCHASE CARRY
+BuyLeft:AddToggle("AutoPurchaseCarry", {
+    Text    = "Auto Purchase Carry",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoPurchaseCarry", function()
+                Events:WaitForChild("PurchaseCarry"):FireServer()
+            end, function() return Options.PurchaseCarryDelay.Value end)
+        else
+            stopLoop("AutoPurchaseCarry")
+        end
+    end,
+})
+
+BuyLeft:AddSlider("PurchaseCarryDelay", {
+    Text = "Purchase Carry Delay", Default = 0.5, Min = 0, Max = 1, Rounding = 1, Suffix = "s",
+})
+
+-- AUTO PURCHASE SPEED (kanan)
+BuyRight:AddDropdown("PurchaseSpeedSelector", {
+    Values  = { "10", "5", "1" },
+    Default = 1,
+    Multi   = true,
+    Text    = "Speed Tier",
+    Tooltip = "Pilih tier speed (bisa multi)",
+})
+
+BuyRight:AddToggle("AutoPurchaseSpeed", {
+    Text    = "Auto Purchase Speed",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoPurchaseSpeed", function()
+                local selected = Options.PurchaseSpeedSelector.Value
+                for tier, active in pairs(selected) do
+                    if active then
+                        Events:WaitForChild("PurchaseSpeed"):FireServer(tonumber(tier))
+                    end
+                end
+            end, function() return Options.PurchaseSpeedDelay.Value end)
+        else
+            stopLoop("AutoPurchaseSpeed")
+        end
+    end,
+})
+
+BuyRight:AddSlider("PurchaseSpeedDelay", {
+    Text = "Purchase Speed Delay", Default = 0.5, Min = 0, Max = 1, Rounding = 1, Suffix = "s",
+})
+
+BuyRight:AddDivider()
+
+-- AUTO UPGRADE BRAINROT
+-- Display: 1-30 = Floor1/Slot1 - Floor3/Slot10, All = semua slot
+local slotDisplayValues = {}
+for i = 1, 30 do
+    table.insert(slotDisplayValues, tostring(i))
+end
+table.insert(slotDisplayValues, "All")
+
+local function getFloorSlot(displayNum)
+    -- 1-10 = Floor1 Slot1-10, 11-20 = Floor2 Slot1-10, 21-30 = Floor3 Slot1-10
+    local floor = math.ceil(displayNum / 10)
+    local slot  = ((displayNum - 1) % 10) + 1
+    return "Floor" .. floor, "Slot" .. slot
+end
+
+BuyRight:AddDropdown("UpgradeBrainrotSelector", {
+    Values     = slotDisplayValues,
+    Default    = 1,
+    Multi      = true,
+    Text       = "Slot (1-30 / All)",
+    Searchable = false,
+    Tooltip    = "1-10=Floor1, 11-20=Floor2, 21-30=Floor3. All=semua slot",
+})
+
+BuyRight:AddToggle("AutoUpgradeBrainrot", {
+    Text    = "Auto Upgrade Brainrot",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoUpgradeBrainrot", function()
+                local selected = Options.UpgradeBrainrotSelector.Value
+                if selected["All"] then
+                    -- upgrade semua slot
+                    for i = 1, 30 do
+                        local floor, slot = getFloorSlot(i)
+                        pcall(function()
+                            Events:WaitForChild("RequestSlotUpgrade"):FireServer(floor, slot)
+                        end)
+                    end
+                else
+                    for num, active in pairs(selected) do
+                        if active and num ~= "All" then
+                            local n = tonumber(num)
+                            if n then
+                                local floor, slot = getFloorSlot(n)
+                                pcall(function()
+                                    Events:WaitForChild("RequestSlotUpgrade"):FireServer(floor, slot)
+                                end)
+                            end
+                        end
+                    end
+                end
+            end, function() return Options.UpgradeBrainrotDelay.Value end)
+        else
+            stopLoop("AutoUpgradeBrainrot")
+        end
+    end,
+})
+
+BuyRight:AddSlider("UpgradeBrainrotDelay", {
+    Text = "Upgrade Delay", Default = 0.5, Min = 0, Max = 1, Rounding = 1, Suffix = "s",
+})
+
+-- =============================================
+--  UI SETTINGS
+-- =============================================
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
+
+MenuGroup:AddToggle("KeybindMenuOpen", {
+    Default  = Library.KeybindFrame.Visible,
+    Text     = "Open Keybind Menu",
+    Callback = function(Value) Library.KeybindFrame.Visible = Value end,
+})
+
+MenuGroup:AddToggle("ShowCustomCursor", {
+    Text = "Custom Cursor", Default = true,
+    Callback = function(Value) Library.ShowCustomCursor = Value end,
+})
+
+MenuGroup:AddDropdown("NotificationSide", {
+    Values = { "Left", "Right" }, Default = "Right", Text = "Notification Side",
+    Callback = function(Value) Library:SetNotifySide(Value) end,
+})
+
+MenuGroup:AddDropdown("DPIDropdown", {
+    Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" }, Default = "100%", Text = "DPI Scale",
+    Callback = function(Value)
+        Value = Value:gsub("%%", "")
+        Library:SetDPIScale(tonumber(Value))
+    end,
+})
+
+MenuGroup:AddDivider()
+
+MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", {
+    Default = "RightShift", NoUI = true, Text = "Menu keybind",
+})
+
+MenuGroup:AddButton("Unload", function()
+    placeItemRunning = false
+    for key in pairs(threads) do stopLoop(key) end
+    Library:Unload()
+end)
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+-- =============================================
+--  SETUP ADDON
+-- =============================================
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("RilzHub")
+SaveManager:SetFolder("RilzHub/configs")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+SaveManager:LoadAutoloadConfig()
+
+Library:Notify({
+    Title       = "Rilz Hub",
+    Description = "Script berhasil diload! v3.0",
+    Time        = 3,
+})
