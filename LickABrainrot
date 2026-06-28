@@ -1,0 +1,515 @@
+-- Script dibuat menggunakan Obsidian UI Library
+-- Base URL dari: https://github.com/aaakjolaka299pp-wq/Gui
+
+local repo = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Gui/main/"
+
+local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+
+-- =============================================
+--  WINDOW
+-- =============================================
+local Window = Library:CreateWindow({
+    Title            = "Rilz Hub",
+    Footer           = "version: 2.0",
+    Icon             = 6031763489, -- Crown icon
+    NotifySide       = "Right",
+    ShowCustomCursor = true,
+    AutoShow         = true,
+})
+
+-- =============================================
+--  TABS
+-- =============================================
+local Tabs = {
+    Main            = Window:AddTab("Main", "zap"),
+    Buy             = Window:AddTab("Buy", "shopping-cart"),
+    ["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
+
+-- =============================================
+--  REMOTE SHORTCUTS
+-- =============================================
+local RS      = game:GetService("ReplicatedStorage")
+local Remotes = RS:WaitForChild("Remotes")
+
+local function fireDoubleStrength()
+    Remotes:WaitForChild("doubleStrength"):FireServer()
+end
+
+local function fireRebirth()
+    Remotes:WaitForChild("Rebirth"):InvokeServer()
+end
+
+local function fireBuySpeed(tier)
+    Remotes:WaitForChild("BuySpeed"):InvokeServer(tier)
+end
+
+local function fireBuyTongue(name)
+    Remotes:WaitForChild("BuyTongue"):InvokeServer(name)
+end
+
+local function fireBuyGym(name)
+    Remotes:WaitForChild("BuyGym"):InvokeServer(name)
+end
+
+local function fireClaim(index)
+    Remotes:WaitForChild("Claim"):InvokeServer(index)
+end
+
+local function fireUpgradeSlot()
+    Remotes:WaitForChild("MenuInteraction"):InvokeServer("UpgradeSlot")
+end
+
+local function fireDupe()
+    Remotes:WaitForChild("FinishRun"):InvokeServer(true)
+end
+
+-- =============================================
+--  LOOP THREADS
+-- =============================================
+local threads = {}
+
+local function startLoop(key, fn, getDelay)
+    if threads[key] then
+        task.cancel(threads[key])
+        threads[key] = nil
+    end
+    threads[key] = task.spawn(function()
+        while Toggles[key] and Toggles[key].Value do
+            local ok, err = pcall(fn)
+            if not ok then
+                warn("[" .. key .. "] Error:", err)
+            end
+            local d = getDelay()
+            if d <= 0 then
+                task.wait()
+            else
+                task.wait(d)
+            end
+        end
+    end)
+end
+
+local function stopLoop(key)
+    if threads[key] then
+        task.cancel(threads[key])
+        threads[key] = nil
+    end
+end
+
+-- =============================================
+--  TAB: MAIN  (Auto Fast X2 & Auto Rebirth)
+-- =============================================
+local TeleportGroup = Tabs.Main:AddLeftGroupbox("Teleport", "map-pin")
+local MainLeft  = Tabs.Main:AddLeftGroupbox("Auto Lick", "zap")
+local MainRight = Tabs.Main:AddRightGroupbox("Auto Rebirth", "refresh-cw")
+
+-- TWEEN TO START ZONE
+TeleportGroup:AddButton({
+    Text    = "Tween To Start Zone",
+    Tooltip = "Tween karakter ke zona start (1965.8, 122.2, 3594.2)",
+    Func    = function()
+        local player = game.Players.LocalPlayer
+        local char   = player.Character
+        if not char then
+            Library:Notify({ Title = "Error", Description = "Character tidak ditemukan!", Time = 3 })
+            return
+        end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then
+            Library:Notify({ Title = "Error", Description = "HumanoidRootPart tidak ditemukan!", Time = 3 })
+            return
+        end
+        local TweenService = game:GetService("TweenService")
+        local targetCFrame = CFrame.new(1965.8, 122.2, 3594.2)
+        local tween = TweenService:Create(hrp, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            CFrame = targetCFrame
+        })
+        tween:Play()
+        Library:Notify({ Title = "Rilz Hub", Description = "Tweening ke Start Zone...", Time = 2 })
+    end,
+})
+
+-- AUTO FAST X2
+MainLeft:AddToggle("AutoFastX2", {
+    Text    = "Auto Fast X2",
+    Default = false,
+    Tooltip = "Auto fire doubleStrength setiap interval",
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoFastX2", fireDoubleStrength, function()
+                return Options.FastX2Delay.Value
+            end)
+        else
+            stopLoop("AutoFastX2")
+        end
+    end,
+})
+
+MainLeft:AddSlider("FastX2Delay", {
+    Text     = "Fast X2 Delay",
+    Default  = 0.5,
+    Min      = 0,
+    Max      = 1,
+    Rounding = 1,
+    Suffix   = "s",
+    Tooltip  = "0 = secepat mungkin, 1 = 1 detik",
+})
+
+MainLeft:AddDivider()
+
+-- AUTO COLLECT CASH
+MainLeft:AddToggle("AutoCollectCash", {
+    Text    = "Auto Collect Cash",
+    Default = false,
+    Tooltip = "Auto Claim slot 1 sampai 40 secara loop",
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoCollectCash", function()
+                for i = 1, 40 do
+                    pcall(fireClaim, i)
+                    task.wait()
+                end
+            end, function()
+                return Options.CollectCashDelay.Value
+            end)
+        else
+            stopLoop("AutoCollectCash")
+        end
+    end,
+})
+
+MainLeft:AddSlider("CollectCashDelay", {
+    Text     = "Collect Cash Delay",
+    Default  = 0.5,
+    Min      = 0,
+    Max      = 1,
+    Rounding = 1,
+    Suffix   = "s",
+})
+
+MainLeft:AddDivider()
+
+-- AUTO UPGRADE SLOT
+MainLeft:AddToggle("AutoUpgradeSlot", {
+    Text    = "Auto Upgrade Slot",
+    Default = false,
+    Tooltip = "Auto upgrade slot base",
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoUpgradeSlot", fireUpgradeSlot, function()
+                return Options.UpgradeSlotDelay.Value
+            end)
+        else
+            stopLoop("AutoUpgradeSlot")
+        end
+    end,
+})
+
+MainLeft:AddSlider("UpgradeSlotDelay", {
+    Text     = "Upgrade Slot Delay",
+    Default  = 0.5,
+    Min      = 0,
+    Max      = 1,
+    Rounding = 1,
+    Suffix   = "s",
+})
+
+MainLeft:AddDivider()
+
+-- AUTO DUPE
+MainLeft:AddToggle("AutoDupe", {
+    Text    = "Auto Dupe",
+    Default = false,
+    Tooltip = "Auto fire FinishRun(true)",
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoDupe", fireDupe, function()
+                return Options.DupeDelay.Value
+            end)
+        else
+            stopLoop("AutoDupe")
+        end
+    end,
+})
+
+MainLeft:AddSlider("DupeDelay", {
+    Text     = "Dupe Delay",
+    Default  = 0.5,
+    Min      = 0,
+    Max      = 1,
+    Rounding = 1,
+    Suffix   = "s",
+})
+
+-- AUTO REBIRTH (kanan)
+MainRight:AddToggle("AutoRebirth", {
+    Text    = "Auto Rebirth",
+    Default = false,
+    Tooltip = "Auto invoke Rebirth setiap interval",
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoRebirth", fireRebirth, function()
+                return Options.RebirthDelay.Value
+            end)
+        else
+            stopLoop("AutoRebirth")
+        end
+    end,
+})
+
+MainRight:AddSlider("RebirthDelay", {
+    Text     = "Rebirth Delay",
+    Default  = 1,
+    Min      = 0,
+    Max      = 5,
+    Rounding = 1,
+    Suffix   = "s",
+    Tooltip  = "0 = secepat mungkin, 5 = 5 detik",
+})
+
+-- =============================================
+--  TAB: BUY  (Tongue, Speed, Gym)
+-- =============================================
+local BuyLeft  = Tabs.Buy:AddLeftGroupbox("Tongue & Speed", "shopping-cart")
+local BuyRight = Tabs.Buy:AddRightGroupbox("Gym", "dumbbell")
+
+-- AUTO BUY TONGUE
+BuyLeft:AddDropdown("TongueList", {
+    Values = {
+        "Basic",
+        "Silver",
+        "Gold",
+        "Diamond",
+        "Rainbow",
+        "Candy",
+        "Toxic",
+        "Lava",
+        "Plant",
+        "Beach",
+        "YingYang",
+        "SixSeven",
+        "Transparent",
+        "Ice",
+        "Firework",
+        "Banana",
+        "Void",
+    },
+    Default    = 1,
+    Multi      = true,
+    Text       = "Tongue",
+    Tooltip    = "Pilih tongue yang mau dibeli (bisa multi)",
+    Searchable = true,
+})
+
+BuyLeft:AddToggle("AutoBuyTongue", {
+    Text    = "Auto Buy Tongue",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoBuyTongue", function()
+                local selected = Options.TongueList.Value
+                for tongue, active in pairs(selected) do
+                    if active then
+                        fireBuyTongue(tongue)
+                    end
+                end
+            end, function()
+                return Options.BuyTongueDelay.Value
+            end)
+        else
+            stopLoop("AutoBuyTongue")
+        end
+    end,
+})
+
+BuyLeft:AddSlider("BuyTongueDelay", {
+    Text     = "Buy Tongue Delay",
+    Default  = 0.5,
+    Min      = 0,
+    Max      = 1,
+    Rounding = 1,
+    Suffix   = "s",
+})
+
+BuyLeft:AddDivider()
+
+-- AUTO BUY SPEED
+BuyLeft:AddDropdown("SpeedTiers", {
+    Values  = { "25", "10", "5", "1" },
+    Default = 1,
+    Multi   = true,
+    Text    = "Speed Tier",
+    Tooltip = "Pilih tier speed yang mau dibeli (bisa multi)",
+})
+
+BuyLeft:AddToggle("AutoBuySpeed", {
+    Text    = "Auto Buy Speed",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoBuySpeed", function()
+                local selected = Options.SpeedTiers.Value
+                for tier, active in pairs(selected) do
+                    if active then
+                        fireBuySpeed(tonumber(tier))
+                    end
+                end
+            end, function()
+                return Options.BuySpeedDelay.Value
+            end)
+        else
+            stopLoop("AutoBuySpeed")
+        end
+    end,
+})
+
+BuyLeft:AddSlider("BuySpeedDelay", {
+    Text     = "Buy Speed Delay",
+    Default  = 0.5,
+    Min      = 0,
+    Max      = 1,
+    Rounding = 1,
+    Suffix   = "s",
+})
+
+-- AUTO BUY GYM (kanan)
+BuyRight:AddDropdown("GymList", {
+    Values = {
+        "Basic",
+        "Uncommon",
+        "Candy",
+        "Lava",
+        "Hacker",
+        "Angel",
+        "Glitched",
+        "Rainbow",
+        "Evil",
+        "Sunburst",
+        "Plasma",
+        "Secret",
+    },
+    Default    = 1,
+    Multi      = true,
+    Text       = "Gym",
+    Tooltip    = "Pilih gym yang mau dibeli (bisa multi)",
+    Searchable = true,
+})
+
+BuyRight:AddToggle("AutoBuyGym", {
+    Text    = "Auto Buy Gym",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            startLoop("AutoBuyGym", function()
+                local selected = Options.GymList.Value
+                for gym, active in pairs(selected) do
+                    if active then
+                        fireBuyGym(gym)
+                    end
+                end
+            end, function()
+                return Options.BuyGymDelay.Value
+            end)
+        else
+            stopLoop("AutoBuyGym")
+        end
+    end,
+})
+
+BuyRight:AddSlider("BuyGymDelay", {
+    Text     = "Buy Gym Delay",
+    Default  = 0.5,
+    Min      = 0,
+    Max      = 1,
+    Rounding = 1,
+    Suffix   = "s",
+})
+
+-- =============================================
+--  UI SETTINGS
+-- =============================================
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
+
+MenuGroup:AddToggle("KeybindMenuOpen", {
+    Default  = Library.KeybindFrame.Visible,
+    Text     = "Open Keybind Menu",
+    Callback = function(Value)
+        Library.KeybindFrame.Visible = Value
+    end,
+})
+
+MenuGroup:AddToggle("ShowCustomCursor", {
+    Text     = "Custom Cursor",
+    Default  = true,
+    Callback = function(Value)
+        Library.ShowCustomCursor = Value
+    end,
+})
+
+MenuGroup:AddDropdown("NotificationSide", {
+    Values   = { "Left", "Right" },
+    Default  = "Right",
+    Text     = "Notification Side",
+    Callback = function(Value)
+        Library:SetNotifySide(Value)
+    end,
+})
+
+MenuGroup:AddDropdown("DPIDropdown", {
+    Values   = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" },
+    Default  = "100%",
+    Text     = "DPI Scale",
+    Callback = function(Value)
+        Value = Value:gsub("%%", "")
+        Library:SetDPIScale(tonumber(Value))
+    end,
+})
+
+MenuGroup:AddDivider()
+
+MenuGroup:AddLabel("Menu Keybind")
+    :AddKeyPicker("MenuKeybind", {
+        Default = "RightShift",
+        NoUI    = true,
+        Text    = "Menu keybind",
+    })
+
+MenuGroup:AddButton("Unload", function()
+    for key, _ in pairs(threads) do
+        stopLoop(key)
+    end
+    Library:Unload()
+end)
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+-- =============================================
+--  SETUP ADDON
+-- =============================================
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("BrainrotScript")
+SaveManager:SetFolder("BrainrotScript/configs")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+SaveManager:LoadAutoloadConfig()
+
+Library:Notify({
+    Title       = "Brainrot Script",
+    Description = "Script berhasil diload! v2.0",
+    Time        = 3,
+})
