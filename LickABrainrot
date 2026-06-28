@@ -509,7 +509,7 @@ ThemeManager:ApplyToTab(Tabs["UI Settings"])
 SaveManager:LoadAutoloadConfig()
 
 Library:Notify({
-    Title       = "Brainrot Script",
+    Title       = "Lick A Brainrot Script",
     Description = "Script berhasil diload! v2.0",
     Time        = 3,
 })
