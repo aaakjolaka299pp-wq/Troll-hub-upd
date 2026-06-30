@@ -1,0 +1,940 @@
+-- Paper Plane For Brainrots | Rilzz Hub
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
+local Players           = game:GetService("Players")
+local LocalPlayer       = Players.LocalPlayer
+
+LocalPlayer:WaitForChild("PlayerGui")
+
+-- UI Library: Obsidian (https://github.com/aaakjolaka299pp-wq/Gui - fork resmi Obsidian)
+local repo = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Gui/main/"
+
+local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager   = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+-- Load game modules
+local GameCore    = require(ReplicatedStorage:WaitForChild("GameCore",    9e9))
+local ClientCore  = require(ReplicatedStorage:WaitForChild("ClientCore",  9e9))
+local UtilityCore = require(ReplicatedStorage:WaitForChild("UtilityCore", 9e9))
+local Network     = GameCore.Network
+
+local ClientModules         = ReplicatedStorage:WaitForChild("ClientModules",  9e9)
+local Controllers           = ClientModules:WaitForChild("Controllers",        9e9)
+local EventDrivenController = require(Controllers:WaitForChild("EventDrivenController", 9e9))
+
+-- ========================
+-- HOOK: Tangkap hasil RequestActiveFlight
+-- ========================
+-- Delta tidak support hookfunction/replaceclosure per-object.
+-- Solusi: hookmetamethod di game (root Instance) untuk intercept semua __namecall,
+-- lalu filter khusus yang targetnya RequestActiveFlight:InvokeServer.
+_G.LastFlightResult = nil
+
+local hookOk = false
+
+if hookmetamethod then
+    hookOk = pcall(function()
+        local targetRemote = Network.RequestActiveFlight
+        local ClaimFlight = ReplicatedStorage
+            :WaitForChild("SharedModules")
+            :WaitForChild("Network")
+            :WaitForChild("ClaimFlight")
+
+        local oldNamecall
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            local method = getnamecallmethod()
+            if method == "InvokeServer" and self == targetRemote then
+                local result = oldNamecall(self, ...)
+                if typeof(result) == "table" then
+                    _G.LastFlightResult = result
+
+                    -- KLAIM dengan delay kecil supaya server selesai assign brainrot dulu
+                    -- Server punya pickupTime ~12 detik, masih banyak waktu
+                    -- HANYA brainrot TERAKHIR di array yang valid untuk diklaim (1 per flight)
+                    if _G.AutoFarmBrainrots then
+                        local capturedTimeInAir = result.timeInAir or 6
+                        task.spawn(function()
+                            -- Tunggu flight benar2 landed dulu (sama seperti debug yang berhasil)
+                            task.wait(capturedTimeInAir + 1)
+
+                            local function claimUID(item)
+                                local uid = (typeof(item) == "string") and item
+                                    or (typeof(item) == "table" and (item.uid or item.UID or item.id))
+                                if not uid then return end
+                                local ok, err = pcall(function()
+                                    ClaimFlight:InvokeServer(uid)
+                                end)
+                                task.wait(0.05)
+                            end
+
+                            if result.spawnedBrainrots and #result.spawnedBrainrots > 0 then
+                                local firstItem = result.spawnedBrainrots[1]
+                                claimUID(firstItem)
+                            end
+                            if result.spawnedCurrencies and #result.spawnedCurrencies > 0 then
+                                local firstCurrency = result.spawnedCurrencies[1]
+                                claimUID(firstCurrency)
+                            end
+
+                            -- Setelah klaim remote selesai, baru cari & fire ProximityPrompt claim fisiknya
+                            if _G.PP_FireClaimPrompt then
+                                task.wait(0.3)
+                                local plr = Players.LocalPlayer
+                                local c   = plr.Character
+                                local hrp = c and c:FindFirstChild("HumanoidRootPart")
+                                if hrp then
+                                    _G.PP_FireClaimPrompt(hrp)
+                                end
+                            end
+                        end)
+                    end
+                end
+                return result
+            end
+            return oldNamecall(self, ...)
+        end)
+    end)
+end
+
+if not hookOk then
+    warn("[PaperPlane] hookmetamethod game gagal. Auto Farm pakai mode fallback manual invoke.")
+end
+
+-- Helper fallback: kalau hook gagal total, kita invoke RequestActiveFlight sendiri
+-- secara manual dengan data minimal yang ditiru dari contoh request asli (Remote Spy).
+-- Server tampaknya cukup permisif soal beberapa field non-kritis (posisi visual dsb),
+-- karena yang dia hitung ulang sendiri adalah hasil (spawnedBrainrots/timeInAir).
+local SharedNetwork = ReplicatedStorage
+    :WaitForChild("SharedModules")
+    :WaitForChild("Network")
+
+-- Ambil LaunchZone dengan Y tertinggi (tower tertinggi di server)
+local function getBestLaunchZone()
+    local CS = game:GetService("CollectionService")
+    local zones = CS:GetTagged("LAUNCH_ZONE")
+    local best = nil
+    local bestY = -math.huge
+    for _, zone in ipairs(zones) do
+        if zone:IsA("BasePart") and zone.Position.Y > bestY then
+            bestY = zone.Position.Y
+            best = zone
+        end
+    end
+    return best
+end
+
+-- Cari ProximityPrompt terdekat (khusus "Claim" brainrot) dari posisi karakter, lalu teleport + fire
+local function isClaimPrompt(obj)
+    local name       = (obj.Name or ""):lower()
+    local actionText = (obj.ActionText or ""):lower()
+    local objectText = (obj.ObjectText or ""):lower()
+
+    if name:find("claim") or actionText:find("claim") or objectText:find("claim") then
+        return true
+    end
+
+    -- Fallback: prompt yang berada di dalam folder CapturBrainrots
+    -- (struktur: Workspace.Live.Debris.CapturBrainrots.<brainrot>.ProximityPrompt)
+    local ancestor = obj.Parent
+    while ancestor do
+        if ancestor.Name == "CapturBrainrots" then
+            return true
+        end
+        ancestor = ancestor.Parent
+    end
+
+    return false
+end
+
+-- Ambil posisi world dari part/model parent prompt, dengan beberapa fallback
+local function getPromptPosition(prompt)
+    local part = prompt.Parent
+    if not part then return nil end
+
+    if part:IsA("BasePart") then
+        return part.Position
+    end
+
+    if part:IsA("Model") then
+        if part.PrimaryPart then
+            return part.PrimaryPart.Position
+        end
+        local ok, pivot = pcall(function() return part:GetPivot() end)
+        if ok and pivot then
+            return pivot.Position
+        end
+        local firstPart = part:FindFirstChildWhichIsA("BasePart", true)
+        if firstPart then
+            return firstPart.Position
+        end
+    end
+
+    return nil
+end
+
+local function getNearestPrompt(fromPos)
+    local nearest, nearestDist = nil, math.huge
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.Enabled and isClaimPrompt(obj) then
+            local pos = getPromptPosition(obj)
+            if pos then
+                local dist = (pos - fromPos).Magnitude
+                if dist < nearestDist then
+                    nearestDist = dist
+                    nearest = obj
+                end
+            end
+        end
+    end
+    return nearest, nearestDist
+end
+
+local function teleportAndFireNearestPrompt(hrp)
+    if not hrp then return end
+    local prompt, dist = getNearestPrompt(hrp.Position)
+    if not prompt then
+        return
+    end
+
+    local promptPos = getPromptPosition(prompt)
+    if not promptPos then
+        return
+    end
+
+    local targetCFrame = CFrame.new(promptPos + Vector3.new(0, 3, 0))
+
+    -- Teleport beberapa kali berturut-turut untuk lawan reset posisi dari
+    -- animasi landing / physics yang mungkin masih jalan sesaat setelah flight.
+    for i = 1, 5 do
+        hrp.AssemblyLinearVelocity  = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+        hrp.CFrame = targetCFrame
+        task.wait(0.05)
+    end
+
+    local actualDist = (hrp.Position - promptPos).Magnitude
+    local maxActDist = prompt.MaxActivationDistance or 10
+
+    -- Coba fire beberapa kali, kasih jeda kecil antar percobaan
+    for i = 1, 3 do
+        local ok, err = pcall(function()
+            if fireproximityprompt then
+                fireproximityprompt(prompt)
+            elseif fireclickdetector then
+                -- fallback (jarang dipakai untuk ProximityPrompt, tapi aman dicoba)
+                fireclickdetector(prompt)
+            else
+                error("fireproximityprompt tidak tersedia di executor ini")
+            end
+        end)
+        task.wait(0.1)
+
+        -- Kalau prompt sudah hilang/destroyed setelah fire, berarti claim berhasil
+        if not prompt.Parent then
+            break
+        end
+    end
+end
+
+_G.PP_FireClaimPrompt = teleportAndFireNearestPrompt
+
+local function ManualRequestActiveFlight()
+    local LocalPlr = Players.LocalPlayer
+    local char = LocalPlr.Character
+    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+    local startPos = hrp and hrp.Position or Vector3.new(0, 0, 0)
+
+    -- Ambil LaunchZone terbaik (Y tertinggi = tower tertinggi)
+    local bestZone = getBestLaunchZone()
+    local plotIndex  = (bestZone and bestZone:GetAttribute("PlotIndex"))  or 1
+    local buildFloors = (bestZone and bestZone:GetAttribute("BuildFloors")) or (ClientCore.Data and ClientCore.Data.BuildFloors) or 1
+
+    -- Fire RequestPendingFlight dulu seperti game ori
+    pcall(function()
+        SharedNetwork:WaitForChild("RequestPendingFlight"):FireServer()
+    end)
+    task.wait(0.05)
+
+    local args = {
+        plotIndex        = plotIndex,
+        intensity        = math.random(),
+        serverStrength   = (ClientCore.Data and ClientCore.Data.Strength) or 0,
+        player           = LocalPlr,
+        visualStartPos   = startPos,
+        serverFloors     = buildFloors,
+        flightUID        = game:GetService("HttpService"):GenerateGUID(false),
+        startTime        = tick(),
+        startPos         = startPos,
+        serverPickupTime = 30
+    }
+
+    local ok, result = pcall(function()
+        return SharedNetwork:WaitForChild("RequestActiveFlight"):InvokeServer(args)
+    end)
+
+    if ok and typeof(result) == "table" then
+        -- Klaim langsung karena pickupTime hanya 12 detik
+        task.spawn(function()
+            local ClaimFlight = SharedNetwork:WaitForChild("ClaimFlight")
+            local function claimUID(item)
+                local uid = (typeof(item) == "string") and item
+                    or (typeof(item) == "table" and (item.uid or item.UID or item.id))
+                if not uid then return end
+                pcall(function() ClaimFlight:InvokeServer(uid) end)
+                task.wait(0.05)
+            end
+            if result.spawnedBrainrots then
+                for _, item in ipairs(result.spawnedBrainrots) do claimUID(item) end
+            end
+            if result.spawnedCurrencies then
+                for _, item in ipairs(result.spawnedCurrencies) do claimUID(item) end
+            end
+
+            -- Setelah klaim remote selesai, baru cari & fire ProximityPrompt claim fisiknya
+            if _G.PP_FireClaimPrompt then
+                task.wait(0.3)
+                local plr = Players.LocalPlayer
+                local c   = plr.Character
+                local hrp = c and c:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    _G.PP_FireClaimPrompt(hrp)
+                end
+            end
+        end)
+        return result
+    end
+    return nil
+end
+
+-- Load FlightManager
+local FlightManager
+for _, v in ipairs(ReplicatedStorage:GetDescendants()) do
+    if v.Name == "FlightManager" then
+        local ok, mod = pcall(require, v)
+        if ok and mod then
+            FlightManager = mod
+            pcall(function() FlightManager:Init() end)
+            pcall(function() FlightManager:Start() end)
+            break
+        end
+    end
+end
+
+-- ========================
+-- CREATE WINDOW
+-- ========================
+local Window = Library:CreateWindow({
+    Title            = "Rilzz Hub",
+    Footer           = "v1.0.1",
+    Icon             = "send",
+    NotifySide       = "Right",
+    ShowCustomCursor = true,
+})
+
+local Tabs = {
+    Changelog = Window:AddTab("Changelog", "scroll"),
+    Player    = Window:AddTab("Player",    "user"),
+    Main      = Window:AddTab("Main",      "house"),
+    Shop      = Window:AddTab("Shop",      "shopping-cart"),
+    Settings  = Window:AddTab("Settings",  "settings"),
+}
+
+-- ========================
+-- TAB: CHANGELOG
+-- ========================
+local ChangelogBox = Tabs.Changelog:AddLeftGroupbox("Update History", "scroll")
+ChangelogBox:AddLabel("v1.0.1", true)
+ChangelogBox:AddLabel("- Fixed Auto Farm flinging issues\n- Fixed LocalPlayer launch zone targeting\n- Fixed Lucide icon reference for Main tab", true)
+
+-- ========================
+-- TAB: PLAYER
+-- ========================
+local PlayerLeft  = Tabs.Player:AddLeftGroupbox("Movement", "footprints")
+local PlayerRight = Tabs.Player:AddRightGroupbox("Anti AFK", "eye")
+
+local walkspeedValue = 16
+PlayerLeft:AddSlider("WalkSpeedValueSlider", {
+    Text     = "Walk Speed",
+    Step     = 1,
+    Default  = 16,
+    Min      = 1,
+    Max      = 100,
+    Rounding = 0,
+    Callback = function(val)
+        walkspeedValue = val
+    end
+})
+
+local walkspeedEnabled = false
+PlayerLeft:AddToggle("EnableWalkSpeedToggle", {
+    Text     = "Enable WalkSpeed",
+    Default  = false,
+    Callback = function(state)
+        walkspeedEnabled = state
+        if not state then
+            local char = LocalPlayer.Character
+            local hum  = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = 16 end
+        end
+    end
+})
+
+local delayEnableWalkSpeed = 0
+PlayerLeft:AddSlider("EnableWalkSpeedDelaySlider", {
+    Text     = "Enable WalkSpeed Delay",
+    Default  = 0,
+    Min      = 0,
+    Max      = 3,
+    Rounding = 1,
+    Suffix   = "s",
+    Callback = function(val)
+        delayEnableWalkSpeed = val
+    end
+})
+
+task.spawn(function()
+    while true do
+        pcall(function()
+            local char = LocalPlayer.Character
+            local hum  = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.WalkSpeed = walkspeedEnabled and walkspeedValue or 16
+            end
+        end)
+        task.wait(0.1 + delayEnableWalkSpeed)
+    end
+end)
+
+PlayerRight:AddToggle("AntiAFKToggle", {
+    Text     = "Anti AFK",
+    Default  = false,
+    Callback = function(state)
+        if state then
+            local VirtualUser = game:GetService("VirtualUser")
+            _G.AntiAfkConnection = LocalPlayer.Idled:Connect(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
+        else
+            if _G.AntiAfkConnection then
+                _G.AntiAfkConnection:Disconnect()
+                _G.AntiAfkConnection = nil
+            end
+        end
+    end
+})
+
+local delayAntiAFK = 0
+PlayerRight:AddSlider("AntiAFKDelaySlider", {
+    Text     = "Anti AFK Delay",
+    Default  = 0,
+    Min      = 0,
+    Max      = 3,
+    Rounding = 1,
+    Suffix   = "s",
+    Callback = function(val)
+        delayAntiAFK = val
+    end
+})
+
+-- ========================
+-- TAB: MAIN
+-- ========================
+
+-- ========================
+-- SECTION: AUTO FARM
+-- ========================
+local MainLeft  = Tabs.Main:AddLeftGroupbox("Farming", "house")
+local MainRight = Tabs.Main:AddRightGroupbox("Upgrades & Cash", "trending-up")
+
+MainLeft:AddToggle("AutoFarmBrainrotsToggle", {
+    Text    = "Auto Farm Brainrots",
+    Default  = false,
+    Callback = function(state)
+        _G.AutoFarmBrainrots = state
+        if state then
+            task.spawn(function()
+                local char = LocalPlayer.Character
+                local hum  = char and char:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.WalkSpeed = 0
+                    hum.JumpPower = 0
+                    hum.UseJumpPower = true
+                end
+
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                _G.SavedPosition = hrp and hrp.CFrame or nil
+
+                -- Ambil LaunchZone terbaik (tower tertinggi di server)
+                local lzBest = getBestLaunchZone()
+                if lzBest and hrp then
+                    hrp.AssemblyLinearVelocity = Vector3.zero
+                    hrp.CFrame = CFrame.new(lzBest.Position + Vector3.new(0, 5, 0))
+                    task.wait(0.5)
+                end
+
+                while _G.AutoFarmBrainrots do
+                    local okLoop, errLoop = pcall(function()
+                        local c    = LocalPlayer.Character
+                        local hrp2 = c and c:FindFirstChild("HumanoidRootPart")
+                        local hum2 = c and c:FindFirstChildOfClass("Humanoid")
+
+                        if not c or not hrp2 then task.wait(1) return end
+
+                        if hum2 and hum2.WalkSpeed ~= 0 then
+                            hum2.WalkSpeed = 0
+                            hum2.JumpPower = 0
+                        end
+
+                        if ClientCore.IsInFlight or ClientCore.IsInLaunch or ClientCore.IsInCapture then
+                            task.wait(0.3)
+                            return
+                        end
+
+                        -- Selalu update LaunchZone terbaik (bisa berubah kalau ada player baru)
+                        local lz = getBestLaunchZone()
+                        if not lz then
+                            task.wait(0.5)
+                            return
+                        end
+
+                        -- Pastikan benar-benar berdiri di launch zone sebelum lempar
+                        if (hrp2.Position - lz.Position).Magnitude > 5 then
+                            hrp2.AssemblyLinearVelocity  = Vector3.zero
+                            hrp2.AssemblyAngularVelocity = Vector3.zero
+                            hrp2.CFrame = CFrame.new(lz.Position + Vector3.new(0, 5, 0))
+                            task.wait(0.5)
+                        end
+
+
+                        if FlightManager then
+                            pcall(function() FlightManager:ProcessInput() end)
+                        end
+
+                        task.wait(0.45)
+
+                        -- Reset hasil flight sebelumnya sebelum melempar lagi
+                        _G.LastFlightResult = nil
+
+                        if hookOk then
+                            -- Mode hook: biarkan game manggil RequestActiveFlight sendiri,
+                            -- kita cuma menguping hasilnya lewat hook.
+                            pcall(function()
+                                EventDrivenController.EVENTS.CONTROLLERS.GameplayController.ProcessClick:Fire()
+                            end)
+                        else
+                            -- Mode fallback: kita panggil RequestActiveFlight sendiri duluan
+                            -- supaya dapat hasilnya langsung, baru trigger ProcessClick untuk
+                            -- animasi/visual lemparan di client.
+                            _G.LastFlightResult = ManualRequestActiveFlight(lz)
+                            pcall(function()
+                                EventDrivenController.EVENTS.CONTROLLERS.GameplayController.ProcessClick:Fire()
+                            end)
+                        end
+
+                        -- Tunggu sampai benar-benar masuk fase terbang
+                        local timeout = tick()
+                        while not ClientCore.IsInFlight do
+                            if tick() - timeout > 3 then
+                                if FlightManager then
+                                    pcall(function() FlightManager:CancelLaunch() end)
+                                end
+                                return
+                            end
+                            task.wait(0.1)
+                        end
+
+
+                        -- Mode hook: tunggu sampai hasil RequestActiveFlight ke-capture
+                        if hookOk then
+                            local resultTimeout = tick()
+                            while not _G.LastFlightResult do
+                                if tick() - resultTimeout > 5 then break end
+                                task.wait(0.1)
+                            end
+                        end
+
+                        local flightResult = _G.LastFlightResult
+
+                        -- Tunggu selesai terbang (pakai timeInAir kalau ada, fallback 10s)
+                        local flightDuration = (flightResult and flightResult.timeInAir) or 10
+                        local flightTimeout = tick()
+                        while ClientCore.IsInFlight do
+                            if tick() - flightTimeout > (flightDuration + 5) then break end
+                            task.wait(0.1)
+                        end
+
+                        if FlightManager then
+                            pcall(function() FlightManager:UpdateInFlight() end)
+                        end
+
+                        ClientCore.IsInFlight = false
+                        ClientCore.IsInLaunch = false
+                        -- Klaim & fire ProximityPrompt sekarang dipicu otomatis
+                        -- setelah ClaimFlight:InvokeServer() berhasil (lihat hook di atas).
+                    end)
+                    task.wait(0.1)
+                end
+
+            end)
+        else
+            -- Matikan freeze & kembalikan stats
+            pcall(function()
+                local char = LocalPlayer.Character
+                local hum  = char and char:FindFirstChildOfClass("Humanoid")
+                local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+                if hum then
+                    hum.WalkSpeed = 16
+                    hum.JumpPower = 50
+                end
+                if hrp and _G.SavedPosition then
+                    hrp.CFrame = _G.SavedPosition
+                end
+                _G.SavedPosition = nil
+            end)
+        end
+    end
+})
+
+MainLeft:AddDivider()
+
+_G.PP_DelayAutoTrainStrength = 0
+MainLeft:AddToggle("AutoTrainStrengthToggle", {
+    Text    = "Auto Train Strength",
+    Default  = false,
+    Callback = function(state)
+        _G.AutoTrainStrength = state
+        if state then
+            -- Auto Strength (cooldown cepat)
+            task.spawn(function()
+                while _G.AutoTrainStrength do
+                    pcall(function()
+                        Network.RequestStrength:InvokeServer()
+                    end)
+                    local cd = (GameCore.GameConfig and GameCore.GameConfig.STRENGTH_COOLDOWN) or 1
+                    task.wait(cd + _G.PP_DelayAutoTrainStrength)
+                end
+            end)
+            -- Auto Double Strength (cooldown lebih lama, jangan disatukan dengan loop di atas)
+            task.spawn(function()
+                while _G.AutoTrainStrength do
+                    pcall(function()
+                        Network.RequestDoubleStrength:InvokeServer()
+                    end)
+                    local cd = (GameCore.GameConfig and GameCore.GameConfig.DOUBLE_STRENGTH_COOLDOWN) or 4
+                    task.wait(cd + _G.PP_DelayAutoTrainStrength)
+                end
+            end)
+        end
+    end
+})
+MainLeft:AddSlider("AutoTrainStrengthDelaySlider", {
+    Text     = "Auto Train Strength Delay",
+    Default  = 0,
+    Min      = 0,
+    Max      = 3,
+    Rounding = 1,
+    Suffix   = "s",
+    Callback = function(val)
+        _G.PP_DelayAutoTrainStrength = val
+    end
+})
+
+MainLeft:AddDivider()
+
+local delayAutoRebirth = 0
+MainLeft:AddToggle("AutoRebirthToggle", {
+    Text    = "Auto Rebirth",
+    Default  = false,
+    Callback = function(state)
+        _G.AutoRebirth = state
+        if state then
+            task.spawn(function()
+                while _G.AutoRebirth do
+                    pcall(function()
+                        if ClientCore.Data then
+                            Network.Rebirth:InvokeServer()
+                        end
+                    end)
+                    task.wait(0.2 + delayAutoRebirth)
+                end
+            end)
+        end
+    end
+})
+MainLeft:AddSlider("AutoRebirthDelaySlider", {
+    Text     = "Auto Rebirth Delay",
+    Default  = 0,
+    Min      = 0,
+    Max      = 3,
+    Rounding = 1,
+    Suffix   = "s",
+    Callback = function(val)
+        delayAutoRebirth = val
+    end
+})
+
+local delayAutoUpgradeBrainrots = 0
+MainRight:AddToggle("AutoUpgradeBrainrotsToggle", {
+    Text    = "Auto Upgrade Brainrots",
+    Default  = false,
+    Callback = function(state)
+        _G.AutoUpgradeBrainrots = state
+        if state then
+            task.spawn(function()
+                while _G.AutoUpgradeBrainrots do
+                    pcall(function()
+                        local tag = (GameCore.GameConfig and GameCore.GameConfig.PLOT_BRAINROT_TAG) or "PLOT_BRAINROT"
+                        for _, obj in ipairs(CollectionService:GetTagged(tag)) do
+                            local isMine = (obj:GetAttribute("OwnerUserId") == LocalPlayer.UserId)
+                                or (obj:GetAttribute("Owner") == LocalPlayer.UserId)
+                                or (obj:GetAttribute("PlayerUserId") == LocalPlayer.UserId)
+
+                            if isMine then
+                                local uid = obj:GetAttribute("ItemUID")
+                                    or obj:GetAttribute("UID")
+                                    or obj:GetAttribute("Uid")
+                                    or obj:GetAttribute("Id")
+
+                                if uid then
+                                    pcall(function()
+                                        Network.LevelUpBrainrot:InvokeServer(uid)
+                                    end)
+                                    task.wait(0.05)
+                                end
+                            end
+                        end
+                    end)
+                    task.wait(0.3 + delayAutoUpgradeBrainrots)
+                end
+            end)
+        end
+    end
+})
+MainRight:AddSlider("AutoUpgradeBrainrotsDelaySlider", {
+    Text     = "Auto Upgrade Brainrots Delay",
+    Default  = 0,
+    Min      = 0,
+    Max      = 3,
+    Rounding = 1,
+    Suffix   = "s",
+    Callback = function(val)
+        delayAutoUpgradeBrainrots = val
+    end
+})
+
+MainRight:AddDivider()
+
+local delayAutoUpgradePlot = 0
+MainRight:AddToggle("AutoUpgradePlotToggle", {
+    Text    = "Auto Upgrade Plot",
+    Default  = false,
+    Callback = function(state)
+        _G.AutoUpgradePlot = state
+        if state then
+            task.spawn(function()
+                while _G.AutoUpgradePlot do
+                    pcall(function()
+                        Network.UpgradePlot:InvokeServer()
+                    end)
+                    task.wait(0.5 + delayAutoUpgradePlot)
+                end
+            end)
+        end
+    end
+})
+MainRight:AddSlider("AutoUpgradePlotDelaySlider", {
+    Text     = "Auto Upgrade Plot Delay",
+    Default  = 0,
+    Min      = 0,
+    Max      = 3,
+    Rounding = 1,
+    Suffix   = "s",
+    Callback = function(val)
+        delayAutoUpgradePlot = val
+    end
+})
+
+MainRight:AddDivider()
+
+local delayAutoCollectCash = 0
+MainRight:AddToggle("AutoCollectCashToggle", {
+    Text    = "Auto Collect Cash",
+    Default  = false,
+    Callback = function(state)
+        _G.AutoCollectCash = state
+        if state then
+            task.spawn(function()
+                while _G.AutoCollectCash do
+                    pcall(function()
+                        local data = ClientCore.Data
+                        if not data or not data.Earnings then return end
+                        for plotId, amount in pairs(data.Earnings) do
+                            if type(plotId) == "string" and amount > 0 then
+                                Network.ClaimEarnings:InvokeServer(plotId)
+                            end
+                        end
+                    end)
+                    task.wait(1 + delayAutoCollectCash)
+                end
+            end)
+        end
+    end
+})
+MainRight:AddSlider("AutoCollectCashDelaySlider", {
+    Text     = "Auto Collect Cash Delay",
+    Default  = 0,
+    Min      = 0,
+    Max      = 3,
+    Rounding = 1,
+    Suffix   = "s",
+    Callback = function(val)
+        delayAutoCollectCash = val
+    end
+})
+
+MainRight:AddDivider()
+
+MainRight:AddButton({
+    Text    = "Auto Sell All Brainrots",
+    Tooltip = "Sell semua brainrot sekali klik",
+    Func    = function()
+        pcall(function() Network.SellAllBrainrots:InvokeServer() end)
+    end
+})
+
+-- ========================
+-- TAB: SHOP
+-- ========================
+local ShopLeft  = Tabs.Shop:AddLeftGroupbox("Auto Buy", "shopping-cart")
+local ShopRight = Tabs.Shop:AddRightGroupbox("Floor", "layers")
+
+local delayAutoBuyWeights = 0
+ShopLeft:AddToggle("AutoBuyWeightsToggle", {
+    Text     = "Auto Buy Weights",
+    Default  = false,
+    Callback = function(state)
+        _G.AutoBuyWeights = state
+        if state then
+            task.spawn(function()
+                while _G.AutoBuyWeights do
+                    pcall(function()
+                        local data    = ClientCore.Data
+                        if not data then return end
+                        local weights = GameCore.Databases.SortedWeights
+                        if not weights then return end
+                        for _, weightId in ipairs(weights) do
+                            local weightData = GameCore.Databases.Weights[weightId]
+                            if weightData and not ClientCore.Data.OwnedWeights[weightId] then
+                                Network.BuyWeight:InvokeServer(weightId)
+                                task.wait(0.01)
+                            end
+                        end
+                    end)
+                    task.wait(0.5 + delayAutoBuyWeights)
+                end
+            end)
+        end
+    end
+})
+ShopLeft:AddSlider("AutoBuyWeightsDelaySlider", {
+    Text     = "Auto Buy Weights Delay",
+    Default  = 0,
+    Min      = 0,
+    Max      = 3,
+    Rounding = 1,
+    Suffix   = "s",
+    Callback = function(val)
+        delayAutoBuyWeights = val
+    end
+})
+
+ShopLeft:AddDivider()
+
+local delayAutoBuySpeed = 0
+ShopLeft:AddToggle("AutoBuySpeedToggle", {
+    Text     = "Auto Buy Speed",
+    Default  = false,
+    Callback = function(state)
+        _G.AutoBuySpeed = state
+        if state then
+            task.spawn(function()
+                while _G.AutoBuySpeed do
+                    for i = 3, 1, -1 do
+                        pcall(function()
+                            Network.BuySpeed:InvokeServer(i)
+                        end)
+                        task.wait(0.05)
+                    end
+                    task.wait(0.3 + delayAutoBuySpeed)
+                end
+            end)
+        end
+    end
+})
+ShopLeft:AddSlider("AutoBuySpeedDelaySlider", {
+    Text     = "Auto Buy Speed Delay",
+    Default  = 0,
+    Min      = 0,
+    Max      = 3,
+    Rounding = 1,
+    Suffix   = "s",
+    Callback = function(val)
+        delayAutoBuySpeed = val
+    end
+})
+
+local delayAutoBuyFloor = 0
+ShopRight:AddToggle("AutoBuyFloorToggle", {
+    Text     = "Auto Buy Floor",
+    Default  = false,
+    Callback = function(state)
+        _G.AutoBuyFloor = state
+        if state then
+            task.spawn(function()
+                local tag = (GameCore.GameConfig and GameCore.GameConfig.PLOT_FLOOR_PAD_TAG) or "PLOT_FLOOR_PAD"
+                while _G.AutoBuyFloor do
+                    pcall(function()
+                        for _, pad in ipairs(CollectionService:GetTagged(tag)) do
+                            if pad:IsA("BasePart") and pad:GetAttribute("OwnerUserId") == LocalPlayer.UserId then
+                                pcall(function()
+                                    Network.BuyBuildFloor:InvokeServer(pad)
+                                end)
+                            end
+                        end
+                    end)
+                    task.wait(0.3 + delayAutoBuyFloor)
+                end
+            end)
+        end
+    end
+})
+ShopRight:AddSlider("AutoBuyFloorDelaySlider", {
+    Text     = "Auto Buy Floor Delay",
+    Default  = 0,
+    Min      = 0,
+    Max      = 3,
+    Rounding = 1,
+    Suffix   = "s",
+    Callback = function(val)
+        delayAutoBuyFloor = val
+    end
+})
+
+-- ========================
+-- TAB: SETTINGS (Theme & Save)
+-- ========================
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+
+ThemeManager:SetFolder("RilzzHub_PaperPlane")
+SaveManager:SetFolder("RilzzHub_PaperPlane")
+
+ThemeManager:ApplyToTab(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+SaveManager:LoadAutoloadConfig()
