@@ -35,7 +35,8 @@ local SupportedMaps = {
     [97598239454123] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/GAG2", 
     [111421220771064] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/PushaluckyblockPrem", 
     [112500097711893] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/LickABrainrot", 
-    [101495836894297] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/StealingLuckyBlockFromBadroom"    
+    [101495836894297] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/StealingLuckyBlockFromBadroom",
+    [110373292461174] = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Troll-hub-upd/refs/heads/main/PaperPlaneForBrainrot"
 } 
 
 
