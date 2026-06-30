@@ -6,6 +6,9 @@ local LocalPlayer       = Players.LocalPlayer
 
 LocalPlayer:WaitForChild("PlayerGui")
 
+-- Tunggu game benar-benar siap load sebelum script jalan (fix untuk executor/member yang slow load)
+task.wait(3)
+
 -- UI Library: Obsidian (https://github.com/aaakjolaka299pp-wq/Gui - fork resmi Obsidian)
 local repo = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Gui/main/"
 
@@ -13,15 +16,48 @@ local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
 local SaveManager   = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 
--- Load game modules
-local GameCore    = require(ReplicatedStorage:WaitForChild("GameCore",    9e9))
-local ClientCore  = require(ReplicatedStorage:WaitForChild("ClientCore",  9e9))
-local UtilityCore = require(ReplicatedStorage:WaitForChild("UtilityCore", 9e9))
-local Network     = GameCore.Network
+-- Load game modules dengan timeout lebih reasonable
+local GameCore, ClientCore, UtilityCore, Network, ClientModules, Controllers, EventDrivenController
+local loadAttempts = 0
+while not (GameCore and ClientCore and Network) and loadAttempts < 30 do
+    pcall(function()
+        if not GameCore then
+            GameCore = require(ReplicatedStorage:WaitForChild("GameCore", 3))
+            Network = GameCore.Network
+            print("[Rilzz Hub] ✓ GameCore loaded")
+        end
+        if not ClientCore then
+            ClientCore = require(ReplicatedStorage:WaitForChild("ClientCore", 3))
+            print("[Rilzz Hub] ✓ ClientCore loaded")
+        end
+        if not UtilityCore then
+            UtilityCore = require(ReplicatedStorage:WaitForChild("UtilityCore", 3))
+            print("[Rilzz Hub] ✓ UtilityCore loaded")
+        end
+        if not ClientModules then
+            ClientModules = ReplicatedStorage:WaitForChild("ClientModules", 3)
+            Controllers = ClientModules:WaitForChild("Controllers", 3)
+            EventDrivenController = require(Controllers:WaitForChild("EventDrivenController", 3))
+            print("[Rilzz Hub] ✓ EventDrivenController loaded")
+        end
+    end)
+    if not (GameCore and ClientCore and Network) then
+        loadAttempts = loadAttempts + 1
+        if loadAttempts % 5 == 0 then
+            print("[Rilzz Hub] ⏳ Loading game modules... attempt " .. loadAttempts .. "/30")
+        end
+        task.wait(0.5)
+    end
+end
 
-local ClientModules         = ReplicatedStorage:WaitForChild("ClientModules",  9e9)
-local Controllers           = ClientModules:WaitForChild("Controllers",        9e9)
-local EventDrivenController = require(Controllers:WaitForChild("EventDrivenController", 9e9))
+if not (GameCore and ClientCore and Network) then
+    warn("[Rilzz Hub] ❌ FATAL: Gagal load game modules setelah 15 detik. Kemungkinan:")
+    warn("  1. Game belum fully load, tunggu 5 detik lalu run script lagi")
+    warn("  2. Delta Executor version lama, pakai versi terbaru")
+    warn("  3. Game server issue atau maintenance")
+    error("Script stop - modules tidak tersedia")
+end
+print("[Rilzz Hub] ✓ Semua modules loaded sukses!")
 
 -- ========================
 -- HOOK: Tangkap hasil RequestActiveFlight
@@ -321,6 +357,10 @@ for _, v in ipairs(ReplicatedStorage:GetDescendants()) do
     end
 end
 
+if not FlightManager then
+    warn("[Rilzz Hub] FlightManager tidak ditemukan atau gagal di-load. Pesawat animasi mungkin tidak smooth. Ini normal untuk beberapa executor.")
+end
+
 -- ========================
 -- CREATE WINDOW
 -- ========================
@@ -560,13 +600,17 @@ MainLeft:AddToggle("AutoFarmBrainrotsToggle", {
                         -- Tunggu selesai terbang (pakai timeInAir kalau ada, fallback 10s)
                         local flightDuration = (flightResult and flightResult.timeInAir) or 10
                         local flightTimeout = tick()
+                        
+                        -- Update FlightManager CONTINUOUSLY selama terbang biar animasi smooth
                         while ClientCore.IsInFlight do
                             if tick() - flightTimeout > (flightDuration + 5) then break end
-                            task.wait(0.1)
-                        end
-
-                        if FlightManager then
-                            pcall(function() FlightManager:UpdateInFlight() end)
+                            
+                            -- Update animasi setiap frame
+                            if FlightManager then
+                                pcall(function() FlightManager:UpdateInFlight() end)
+                            end
+                            
+                            task.wait(0.016) -- ~60 FPS
                         end
 
                         ClientCore.IsInFlight = false
