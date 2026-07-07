@@ -1,0 +1,410 @@
+-- Rilzz Hub
+-- UI Library: Obsidian (https://github.com/aaakjolaka299pp-wq/Gui)
+
+local Players           = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer       = Players.LocalPlayer
+
+-- ========================
+-- LOAD LIBRARY
+-- ========================
+local repo = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Gui/main/"
+
+local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+
+-- ========================
+-- REMOTE EVENTS
+-- ========================
+local RemoteEvent   = ReplicatedStorage:WaitForChild("RemoteEvent")
+
+local ManagerEvent  = ReplicatedStorage
+    :WaitForChild("ModuleScripts")
+    :WaitForChild("Manager_\233\163\158\233\149\150")
+    :WaitForChild("Event")
+
+local DartEvent     = ReplicatedStorage
+    :WaitForChild("Control")
+    :WaitForChild("Control_\233\163\158\233\149\150")
+    :WaitForChild("DartEvent")
+
+local BrainrotEvent = ReplicatedStorage
+    :WaitForChild("ModuleScripts")
+    :WaitForChild("Manager_\229\133\179\229\141\161")
+    :WaitForChild("Event")
+
+-- ========================
+-- AUTOSERDE — BridgeNet channel identifier lookup
+-- ========================
+-- AutoSerde berisi CHANNEL identifiers (nama module), BUKAN action names.
+-- "GetGoldOfBrainrot", "SellBrainrot", dll itu cuma string di dalam args table.
+-- Yang perlu kita lookup adalah nama channel (nama module)-nya:
+--   Manager_脑红 (\232\132\145\231\186\162) → semua aksi brainrot (collect/upgrade/sell)
+--   Manager_重生 (\233\135\141\231\148\159) → rebirth
+local AutoSerde = ReplicatedStorage:WaitForChild("AutoSerde")
+
+local function getId(channelName)
+    local sv = AutoSerde:WaitForChild(channelName, 15)
+    if not sv then
+        warn("[RilzzHub] AutoSerde timeout: " .. tostring(channelName))
+        return nil
+    end
+    return sv.Value
+end
+
+-- Cache chars saat script load agar tidak WaitForChild setiap loop
+local CHAN_BRAINROT = nil  -- Manager_脑红 (collect, upgrade, sell)
+local CHAN_REBIRTH  = nil  -- Manager_重生 (rebirth)
+
+task.spawn(function()
+    CHAN_BRAINROT = getId("Manager_\232\132\145\231\186\162")
+    CHAN_REBIRTH  = getId("Manager_\233\135\141\231\148\159")
+    if CHAN_BRAINROT then
+        Library:Notify({ Title = "Rilzz Hub", Description = "Channel IDs berhasil di-load!", Time = 2 })
+    else
+        Library:Notify({ Title = "Rilzz Hub", Description = "Gagal load channel ID — coba rejoin.", Time = 5 })
+    end
+end)
+
+-- ========================
+-- DATA
+-- ========================
+local HAMMER_MAP = {
+    ["Training Hammer"]  = "Dart1",  ["Spike Hammer"]     = "Dart2",
+    ["Wooden Mallet"]    = "Dart3",  ["Rocket Hammer"]    = "Dart4",
+    ["Iron Hammer"]      = "Dart5",  ["Royal Hammer"]     = "Dart6",
+    ["Steel Hammer"]     = "Dart7",  ["Drill Hammer"]     = "Dart8",
+    ["Crimson Hammer"]   = "Dart9",  ["Neon Hammer"]      = "Dart10",
+    ["Frostbreaker"]     = "Dart11", ["Tech Crusher"]     = "Dart12",
+    ["Factory Breaker"]  = "Dart13", ["Thunderstrike"]    = "Dart14",
+    ["Plasma Crusher"]   = "Dart15", ["Void Reaper"]      = "Dart16",
+    ["Cyber Destroyer"]  = "Dart17", ["Shadow Breaker"]   = "Dart18",
+}
+
+local HAMMER_LIST = {
+    "Training Hammer", "Spike Hammer",   "Wooden Mallet",  "Rocket Hammer",
+    "Iron Hammer",     "Royal Hammer",   "Steel Hammer",   "Drill Hammer",
+    "Crimson Hammer",  "Neon Hammer",    "Frostbreaker",   "Tech Crusher",
+    "Factory Breaker", "Thunderstrike",  "Plasma Crusher", "Void Reaper",
+    "Cyber Destroyer", "Shadow Breaker",
+}
+
+local UPGRADE_SLOTS = {}
+for i = 1, 30 do table.insert(UPGRADE_SLOTS, tostring(i)) end
+table.insert(UPGRADE_SLOTS, "All")
+
+-- ========================
+-- WINDOW
+-- ========================
+local Window = Library:CreateWindow({
+    Title            = "Rilzz Hub",
+    Footer           = "v1.0",
+    Icon             = "zap",
+    NotifySide       = "Right",
+    ShowCustomCursor = true,
+    AutoShow         = true,
+})
+
+local Tabs = {
+    Main            = Window:AddTab("Main",        "zap"),
+    Shop            = Window:AddTab("Shop",        "shopping-cart"),
+    ["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
+
+-- ========================
+-- LOOP HELPER
+-- ========================
+local threads = {}
+
+local function startLoop(key, fn, getDelay)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+    threads[key] = task.spawn(function()
+        while Toggles[key] and Toggles[key].Value do
+            pcall(fn)
+            local d = getDelay and getDelay() or 0.5
+            if d <= 0 then task.wait() else task.wait(d) end
+        end
+    end)
+end
+
+local function stopLoop(key)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+end
+
+-- ========================
+-- TAB: MAIN
+-- ========================
+local MainLeft  = Tabs.Main:AddLeftGroupbox("Farming",  "coins")
+local MainRight = Tabs.Main:AddRightGroupbox("Training", "trending-up")
+
+-- AUTO COLLECT
+MainLeft:AddToggle("AutoCollect", {
+    Text    = "Auto Collect",
+    Default = false,
+    Tooltip = "Auto ambil gold dari semua slot brainrot",
+    Callback = function(state)
+        if state then
+            startLoop("AutoCollect", function()
+                if not CHAN_BRAINROT then return end
+                for i = 1, 30 do
+                    RemoteEvent:FireServer({ { CHAN_BRAINROT, { "GetGoldOfBrainrot", i } } })
+                    task.wait()
+                end
+            end, function() return Options.AutoCollectDelay.Value end)
+        else
+            stopLoop("AutoCollect")
+        end
+    end,
+})
+MainLeft:AddSlider("AutoCollectDelay", {
+    Text = "Auto Collect Delay", Default = 0, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+MainLeft:AddDivider()
+
+-- AUTO UPGRADE
+local upgradeSelected = "1"
+MainLeft:AddDropdown("AutoUpgradeSlot", {
+    Values   = UPGRADE_SLOTS,
+    Default  = 1,
+    Multi    = false,
+    Text     = "Upgrade Slot",
+    Tooltip  = "Pilih slot 1–30 atau All",
+    Callback = function(val) upgradeSelected = val end,
+})
+MainLeft:AddToggle("AutoUpgrade", {
+    Text    = "Auto Upgrade",
+    Default = false,
+    Tooltip = "Auto upgrade slot yang dipilih",
+    Callback = function(state)
+        if state then
+            startLoop("AutoUpgrade", function()
+                if not CHAN_BRAINROT then return end
+                if upgradeSelected == "All" then
+                    for i = 1, 30 do
+                        RemoteEvent:FireServer({ { CHAN_BRAINROT, { "BrainrotUpgradeLv", i } } })
+                        task.wait(0.03)
+                    end
+                else
+                    RemoteEvent:FireServer({ { CHAN_BRAINROT, { "BrainrotUpgradeLv", tonumber(upgradeSelected) } } })
+                end
+            end, function() return Options.AutoUpgradeDelay.Value end)
+        else
+            stopLoop("AutoUpgrade")
+        end
+    end,
+})
+MainLeft:AddSlider("AutoUpgradeDelay", {
+    Text = "Auto Upgrade Delay", Default = 0, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+MainLeft:AddDivider()
+
+-- AUTO REBIRTH
+MainLeft:AddToggle("AutoRebirth", {
+    Text    = "Auto Rebirth",
+    Default = false,
+    Tooltip = "Auto rebirth otomatis",
+    Callback = function(state)
+        if state then
+            startLoop("AutoRebirth", function()
+                if not CHAN_REBIRTH then return end
+                RemoteEvent:FireServer({ { CHAN_REBIRTH, { "Rebirth" } } })
+            end, function() return Options.AutoRebirthDelay.Value end)
+        else
+            stopLoop("AutoRebirth")
+        end
+    end,
+})
+MainLeft:AddSlider("AutoRebirthDelay", {
+    Text = "Auto Rebirth Delay", Default = 0.5, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+-- AUTO SPAM POWER
+MainRight:AddToggle("AutoSpamPower", {
+    Text    = "Auto Spam Power",
+    Default = false,
+    Tooltip = "Spam serangan power terus-menerus",
+    Callback = function(state)
+        if state then
+            startLoop("AutoSpamPower", function()
+                DartEvent:FireServer({ "SynAttack", LocalPlayer })
+            end, function() return 0.1 end)
+        else
+            stopLoop("AutoSpamPower")
+        end
+    end,
+})
+
+MainRight:AddDivider()
+
+-- AUTO SPAM GET BRAINROT
+MainRight:AddToggle("AutoGetBrainrot", {
+    Text    = "Auto Spam Get Brainrot",
+    Default = false,
+    Tooltip = "Spam request brainrot baru terus-menerus",
+    Callback = function(state)
+        if state then
+            startLoop("AutoGetBrainrot", function()
+                BrainrotEvent:FireServer({ "GetBoxAndBrainrot", LocalPlayer, 1 })
+            end, function() return 1 end)
+        else
+            stopLoop("AutoGetBrainrot")
+        end
+    end,
+})
+
+MainRight:AddDivider()
+
+-- ANTI AFK
+MainRight:AddToggle("AntiAFK", {
+    Text    = "Anti AFK",
+    Default = false,
+    Tooltip = "Cegah karakter di-kick karena idle",
+    Callback = function(state)
+        if state then
+            local VirtualUser = game:GetService("VirtualUser")
+            _G.AntiAFKConn = LocalPlayer.Idled:Connect(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
+        else
+            if _G.AntiAFKConn then
+                _G.AntiAFKConn:Disconnect()
+                _G.AntiAFKConn = nil
+            end
+        end
+    end,
+})
+
+-- ========================
+-- TAB: SHOP
+-- ========================
+local ShopLeft  = Tabs.Shop:AddLeftGroupbox("Hammers", "sword")
+local ShopRight = Tabs.Shop:AddRightGroupbox("Sell",   "dollar-sign")
+
+-- AUTO BUY HAMMER
+local selectedHammers = {}
+ShopLeft:AddDropdown("HammerSelector", {
+    Values     = HAMMER_LIST,
+    Default    = 1,
+    Multi      = true,
+    Searchable = true,
+    Text       = "Select Hammers",
+    Tooltip    = "Pilih hammer yang mau dibeli (bisa multi)",
+    Callback   = function(val) selectedHammers = val end,
+})
+ShopLeft:AddToggle("AutoBuyHammer", {
+    Text    = "Auto Buy Hammer",
+    Default = false,
+    Tooltip = "Auto beli hammer yang dipilih",
+    Callback = function(state)
+        if state then
+            startLoop("AutoBuyHammer", function()
+                for displayName, active in pairs(selectedHammers) do
+                    if active then
+                        local dartId = HAMMER_MAP[displayName]
+                        if dartId then
+                            ManagerEvent:FireServer({ "Buy", LocalPlayer, dartId })
+                            task.wait(0.05)
+                        end
+                    end
+                end
+            end, function() return Options.AutoBuyHammerDelay.Value end)
+        else
+            stopLoop("AutoBuyHammer")
+        end
+    end,
+})
+ShopLeft:AddSlider("AutoBuyHammerDelay", {
+    Text = "Auto Buy Hammer Delay", Default = 0.5, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+
+-- SELL ALL BRAINROT
+ShopRight:AddButton({
+    Text    = "Sell All Brainrot",
+    Tooltip = "Jual semua brainrot sekarang",
+    Func    = function()
+        pcall(function()
+            if not CHAN_BRAINROT then return end
+            RemoteEvent:FireServer({ { CHAN_BRAINROT, { "SellBrainrot" }, 57.903080311007216 } })
+        end)
+        Library:Notify({ Title = "Rilzz Hub", Description = "Sell All Brainrot berhasil!", Time = 2 })
+    end,
+})
+
+-- ========================
+-- TAB: UI SETTINGS
+-- ========================
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
+
+MenuGroup:AddToggle("KeybindMenuOpen", {
+    Default  = Library.KeybindFrame.Visible,
+    Text     = "Open Keybind Menu",
+    Callback = function(Value) Library.KeybindFrame.Visible = Value end,
+})
+
+MenuGroup:AddToggle("ShowCustomCursor", {
+    Text = "Custom Cursor", Default = true,
+    Callback = function(Value) Library.ShowCustomCursor = Value end,
+})
+
+MenuGroup:AddDropdown("NotificationSide", {
+    Values = { "Left", "Right" }, Default = "Right", Text = "Notification Side",
+    Callback = function(Value) Library:SetNotifySide(Value) end,
+})
+
+MenuGroup:AddDropdown("DPIDropdown", {
+    Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" }, Default = "100%", Text = "DPI Scale",
+    Callback = function(Value)
+        Value = Value:gsub("%%", "")
+        Library:SetDPIScale(tonumber(Value))
+    end,
+})
+
+MenuGroup:AddDivider()
+
+MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", {
+    Default = "RightShift", NoUI = true, Text = "Menu keybind",
+})
+
+MenuGroup:AddButton({
+    Text = "Unload Script",
+    Func = function()
+        for key in pairs(threads) do stopLoop(key) end
+        if _G.AntiAFKConn then _G.AntiAFKConn:Disconnect() end
+        Library:Unload()
+    end,
+})
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+-- ========================
+-- SETUP ADDON
+-- ========================
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("RilzzHub")
+SaveManager:SetFolder("RilzzHub/configs")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+SaveManager:LoadAutoloadConfig()
+
+Library:Notify({
+    Title       = "Rilzz Hub",
+    Description = "Script berhasil diload! v1.0",
+    Time        = 3,
+})
