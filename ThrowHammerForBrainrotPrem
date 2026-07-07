@@ -235,11 +235,14 @@ MainRight:AddToggle("AutoSpamPower", {
         if state then
             startLoop("AutoSpamPower", function()
                 DartEvent:FireServer({ "SynAttack", LocalPlayer })
-            end, function() return 0.1 end)
+            end, function() return Options.AutoSpamPowerDelay.Value end)
         else
             stopLoop("AutoSpamPower")
         end
     end,
+})
+MainRight:AddSlider("AutoSpamPowerDelay", {
+    Text = "Auto Spam Power Delay", Default = 0, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
 })
 
 MainRight:AddDivider()
@@ -253,11 +256,14 @@ MainRight:AddToggle("AutoGetBrainrot", {
         if state then
             startLoop("AutoGetBrainrot", function()
                 BrainrotEvent:FireServer({ "GetBoxAndBrainrot", LocalPlayer, 1 })
-            end, function() return 1 end)
+            end, function() return Options.AutoGetBrainrotDelay.Value end)
         else
             stopLoop("AutoGetBrainrot")
         end
     end,
+})
+MainRight:AddSlider("AutoGetBrainrotDelay", {
+    Text = "Auto Get Brainrot Delay", Default = 0, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
 })
 
 MainRight:AddDivider()
