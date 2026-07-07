@@ -270,20 +270,20 @@ MainRight:AddDivider()
 
 -- INSTANT LEXUS
 MainRight:AddToggle("InstantLexus", {
-    Text    = "Instant Lexus",
+    Text    = "Instant Nexus",
     Default = false,
     Tooltip = "Spam GetBoxAndBrainrot dengan nilai max (math.huge)",
     Callback = function(state)
         if state then
             startLoop("InstantLexus", function()
                 BrainrotEvent:FireServer({ "GetBoxAndBrainrot", LocalPlayer, math.huge })
-            end, function() return Options.InstantLexusDelay.Value end)
+            end, function() return Options.InstantNexusDelay.Value end)
         else
-            stopLoop("InstantLexus")
+            stopLoop("InstantNexus")
         end
     end,
 })
-MainRight:AddSlider("InstantLexusDelay", {
+MainRight:AddSlider("InstantNexusDelay", {
     Text = "Instant Lexus Delay", Default = 0, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
 })
 
