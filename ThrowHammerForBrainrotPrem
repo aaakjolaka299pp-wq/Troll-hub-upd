@@ -268,8 +268,8 @@ MainRight:AddSlider("AutoGetBrainrotDelay", {
 
 MainRight:AddDivider()
 
--- INSTANT LEXUS
-MainRight:AddToggle("InstantLexus", {
+-- INSTANT Nexus
+MainRight:AddToggle("InstantNexus", {
     Text    = "Instant Nexus",
     Default = false,
     Tooltip = "Spam GetBoxAndBrainrot dengan nilai max (math.huge)",
