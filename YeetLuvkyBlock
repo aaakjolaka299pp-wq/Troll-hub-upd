@@ -1,0 +1,445 @@
+-- Rilzz Hub
+-- UI Library: Obsidian (https://github.com/aaakjolaka299pp-wq/Gui)
+
+local Players           = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer       = Players.LocalPlayer
+
+-- ========================
+-- LOAD LIBRARY
+-- ========================
+local repo = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Gui/main/"
+
+local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+
+-- ========================
+-- REMOTES
+-- ========================
+local RemoteFolder = ReplicatedStorage
+    :WaitForChild("packages")
+    :WaitForChild("_Index")
+    :WaitForChild("littensy_remo@1.5.3")
+    :WaitForChild("remo")
+    :WaitForChild("container")
+
+-- ========================
+-- WINDOW
+-- ========================
+local Window = Library:CreateWindow({
+    Title            = "Rilzz Hub",
+    Footer           = "v1.0",
+    Icon             = "zap",
+    NotifySide       = "Right",
+    ShowCustomCursor = true,
+    AutoShow         = true,
+})
+
+local Tabs = {
+    Main            = Window:AddTab("Main",        "zap"),
+    Shop            = Window:AddTab("Shop",        "shopping-cart"),
+    ["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
+
+-- ========================
+-- LOOP HELPER
+-- ========================
+local threads = {}
+
+local function startLoop(key, fn, getDelay)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+    threads[key] = task.spawn(function()
+        while Toggles[key] and Toggles[key].Value do
+            pcall(fn)
+            local d = getDelay and getDelay() or 0.5
+            if d <= 0 then task.wait() else task.wait(d) end
+        end
+    end)
+end
+
+local function stopLoop(key)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+end
+
+-- ========================
+-- TAB: MAIN
+-- ========================
+local MainLeft  = Tabs.Main:AddLeftGroupbox("Farming",  "coins")
+local MainRight = Tabs.Main:AddRightGroupbox("Player",  "user")
+
+-- AUTO COLLECT CASH
+MainLeft:AddToggle("AutoCollectCash", {
+    Text    = "Auto Collect Cash",
+    Default = false,
+    Tooltip = "Auto collect cash dari pad 1-40",
+    Callback = function(state)
+        if state then
+            startLoop("AutoCollectCash", function()
+                for i = 1, 40 do
+                    pcall(function()
+                        RemoteFolder:WaitForChild("data.base.collectPadMoney"):InvokeServer(i)
+                    end)
+                    task.wait()
+                end
+            end, function() return Options.AutoCollectCashDelay.Value end)
+        else
+            stopLoop("AutoCollectCash")
+        end
+    end,
+})
+MainLeft:AddSlider("AutoCollectCashDelay", {
+    Text = "Auto Collect Cash Delay", Default = 0.1, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+MainLeft:AddDivider()
+
+-- AUTO FARM
+local function doAction()
+    local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local HRP = Character:WaitForChild("HumanoidRootPart")
+
+    -- 1. Teleport Awal
+    HRP.CFrame = CFrame.new(-45.0, 33.2, -305.9)
+    task.wait()
+
+    -- 2. TP Guard
+    RemoteFolder:WaitForChild("game.yeet.tpToGuard"):InvokeServer()
+    task.wait()
+
+    -- 3. Throw V1
+    RemoteFolder:WaitForChild("game.yeet.throw"):InvokeServer(0.9070215386371794)
+    task.wait()
+
+    -- 4. Throw V2
+    RemoteFolder:WaitForChild("game.yeet.throw"):InvokeServer()
+    task.wait()
+
+    -- 5. Teleport Baru
+    HRP.CFrame = CFrame.new(3919.1, 36.1, -294.6)
+    task.wait()
+end
+
+MainLeft:AddToggle("AutoFarm", {
+    Text    = "Auto Farm",
+    Default = false,
+    Tooltip = "Auto farm loop: TP → Guard → Throw → TP",
+    Callback = function(state)
+        if state then
+            startLoop("AutoFarm", function()
+                doAction()
+            end, function() return 0 end)
+        else
+            stopLoop("AutoFarm")
+        end
+    end,
+})
+
+MainLeft:AddDivider()
+
+-- AUTO REBIRTH
+MainLeft:AddToggle("AutoRebirth", {
+    Text    = "Auto Rebirth",
+    Default = false,
+    Tooltip = "Auto rebirth otomatis",
+    Callback = function(state)
+        if state then
+            startLoop("AutoRebirth", function()
+                RemoteFolder:WaitForChild("data.base.rebirth"):FireServer()
+            end, function() return Options.AutoRebirthDelay.Value end)
+        else
+            stopLoop("AutoRebirth")
+        end
+    end,
+})
+MainLeft:AddSlider("AutoRebirthDelay", {
+    Text = "Auto Rebirth Delay", Default = 0.5, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+-- ANTI AFK
+MainRight:AddToggle("AntiAFK", {
+    Text    = "Anti AFK",
+    Default = false,
+    Tooltip = "Cegah karakter di-kick karena idle",
+    Callback = function(state)
+        if state then
+            local VirtualUser = game:GetService("VirtualUser")
+            _G.AntiAFKConn = LocalPlayer.Idled:Connect(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
+        else
+            if _G.AntiAFKConn then
+                _G.AntiAFKConn:Disconnect()
+                _G.AntiAFKConn = nil
+            end
+        end
+    end,
+})
+
+MainRight:AddDivider()
+
+-- AUTO CLAIM BONUS
+local selectedBonus = {}
+
+local function clickBonusButton()
+    pcall(function()
+        local popUpGui = LocalPlayer.PlayerGui:FindFirstChild("PopUpGui")
+        if not popUpGui then return end
+        local btn = popUpGui:FindFirstChild("StrenghPopup", true)
+        if btn then
+            local pos = btn.AbsolutePosition
+            local size = btn.AbsoluteSize
+            local center = Vector2.new(pos.X + size.X / 2, pos.Y + size.Y / 2)
+            -- Simulasi mouse click di posisi tengah button
+            local inputService = game:GetService("UserInputService")
+            local mouse = LocalPlayer:GetMouse()
+            mouse.Button1Down:Fire()
+            task.wait(0.05)
+            mouse.Button1Up:Fire()
+        end
+    end)
+end
+
+MainRight:AddDropdown("BonusSelector", {
+    Values   = { "x2", "x4", "x10" },
+    Default  = 1,
+    Multi    = true,
+    Text     = "Select Bonus",
+    Tooltip  = "Pilih bonus yang mau di-claim (bisa multi)",
+    Callback = function(val) selectedBonus = val end,
+})
+MainRight:AddToggle("AutoClaimBonus", {
+    Text    = "Auto Claim Bonus",
+    Default = false,
+    Tooltip = "Auto claim bonus x2/x4/x10",
+    Callback = function(state)
+        if state then
+            startLoop("AutoClaimBonus", function()
+                for bonus, active in pairs(selectedBonus) do
+                    if active then
+                        pcall(function()
+                            RemoteFolder:WaitForChild("data.weight.claimBonus"):FireServer(bonus)
+                        end)
+                        task.wait(0.05)
+                        clickBonusButton()
+                        task.wait(0.05)
+                    end
+                end
+            end, function() return Options.AutoClaimBonusDelay.Value end)
+        else
+            stopLoop("AutoClaimBonus")
+        end
+    end,
+})
+MainRight:AddSlider("AutoClaimBonusDelay", {
+    Text = "Auto Claim Bonus Delay", Default = 0.5, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+-- ========================
+-- TAB: SHOP
+-- ========================
+local ShopLeft  = Tabs.Shop:AddLeftGroupbox("Weights",  "sword")
+local ShopRight = Tabs.Shop:AddRightGroupbox("Upgrades", "trending-up")
+
+-- AUTO BUY DUMBBELL
+local DUMBBELL_MAP = {
+    ["Metal Plate"]    = "metalPlate",
+    ["Rock Dumbbell"]  = "rockDumbbell",
+    ["Cactus Dumbbell"]= "cactusDumbbell",
+    ["Wood Barbell"]   = "woodBarbell",
+    ["Bone Barbell"]   = "boneBarbell",
+    ["Metal Barbell"]  = "metalBarbell",
+    ["Cube Barbell"]   = "cubeBarbell",
+    ["Neon Barbell"]   = "neonBarbell",
+    ["Gold Barbell"]   = "goldBarbell",
+    ["Star Barbell"]   = "starBarbell",
+}
+local DUMBBELL_LIST = {
+    "Metal Plate", "Rock Dumbbell", "Cactus Dumbbell", "Wood Barbell",
+    "Bone Barbell", "Metal Barbell", "Cube Barbell", "Neon Barbell",
+    "Gold Barbell", "Star Barbell",
+}
+
+local selectedDumbbells = {}
+
+ShopLeft:AddDropdown("DumbbellSelector", {
+    Values     = DUMBBELL_LIST,
+    Default    = 1,
+    Multi      = true,
+    Searchable = true,
+    Text       = "Select Weights",
+    Tooltip    = "Pilih weight yang mau dibeli (bisa multi)",
+    Callback   = function(val) selectedDumbbells = val end,
+})
+ShopLeft:AddToggle("AutoBuyDumbbell", {
+    Text    = "Auto Buy Dumbbell",
+    Default = false,
+    Tooltip = "Auto beli weight yang dipilih",
+    Callback = function(state)
+        if state then
+            startLoop("AutoBuyDumbbell", function()
+                -- All
+                local hasAll = selectedDumbbells["All"]
+                for displayName, active in pairs(selectedDumbbells) do
+                    if (active and displayName ~= "All") or hasAll then
+                        local id = DUMBBELL_MAP[displayName]
+                        if id then
+                            pcall(function()
+                                RemoteFolder:WaitForChild("data.weightShop.buyWeight"):FireServer(id)
+                            end)
+                            task.wait(0.05)
+                        end
+                    end
+                end
+                if hasAll then
+                    for _, displayName in ipairs(DUMBBELL_LIST) do
+                        local id = DUMBBELL_MAP[displayName]
+                        if id then
+                            pcall(function()
+                                RemoteFolder:WaitForChild("data.weightShop.buyWeight"):FireServer(id)
+                            end)
+                            task.wait(0.05)
+                        end
+                    end
+                end
+            end, function() return Options.AutoBuyDumbbellDelay.Value end)
+        else
+            stopLoop("AutoBuyDumbbell")
+        end
+    end,
+})
+ShopLeft:AddSlider("AutoBuyDumbbellDelay", {
+    Text = "Auto Buy Dumbbell Delay", Default = 0.5, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+-- AUTO UPGRADE SPEED
+local selectedSpeeds = {}
+
+ShopRight:AddDropdown("SpeedSelector", {
+    Values   = { "1", "5", "10" },
+    Default  = 1,
+    Multi    = true,
+    Text     = "Speed Amount",
+    Tooltip  = "Pilih jumlah upgrade speed (bisa multi)",
+    Callback = function(val) selectedSpeeds = val end,
+})
+ShopRight:AddToggle("AutoUpgradeSpeed", {
+    Text    = "Auto Upgrade Speed",
+    Default = false,
+    Tooltip = "Auto upgrade speed sesuai pilihan",
+    Callback = function(state)
+        if state then
+            startLoop("AutoUpgradeSpeed", function()
+                for amount, active in pairs(selectedSpeeds) do
+                    if active then
+                        pcall(function()
+                            RemoteFolder:WaitForChild("data.upgrades.upgrade"):FireServer("speed", tonumber(amount))
+                        end)
+                        task.wait(0.05)
+                    end
+                end
+            end, function() return Options.AutoUpgradeSpeedDelay.Value end)
+        else
+            stopLoop("AutoUpgradeSpeed")
+        end
+    end,
+})
+ShopRight:AddSlider("AutoUpgradeSpeedDelay", {
+    Text = "Auto Upgrade Speed Delay", Default = 0.1, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+ShopRight:AddDivider()
+
+-- AUTO UPGRADE BASE
+ShopRight:AddToggle("AutoUpgradeBase", {
+    Text    = "Auto Upgrade Base",
+    Default = false,
+    Tooltip = "Auto upgrade base terus-menerus",
+    Callback = function(state)
+        if state then
+            startLoop("AutoUpgradeBase", function()
+                RemoteFolder:WaitForChild("data.base.upgradeBase"):FireServer()
+            end, function() return Options.AutoUpgradeBaseDelay.Value end)
+        else
+            stopLoop("AutoUpgradeBase")
+        end
+    end,
+})
+ShopRight:AddSlider("AutoUpgradeBaseDelay", {
+    Text = "Auto Upgrade Base Delay", Default = 0.1, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+-- ========================
+-- TAB: UI SETTINGS
+-- ========================
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
+
+MenuGroup:AddToggle("KeybindMenuOpen", {
+    Default  = Library.KeybindFrame.Visible,
+    Text     = "Open Keybind Menu",
+    Callback = function(Value) Library.KeybindFrame.Visible = Value end,
+})
+
+MenuGroup:AddToggle("ShowCustomCursor", {
+    Text = "Custom Cursor", Default = true,
+    Callback = function(Value) Library.ShowCustomCursor = Value end,
+})
+
+MenuGroup:AddDropdown("NotificationSide", {
+    Values = { "Left", "Right" }, Default = "Right", Text = "Notification Side",
+    Callback = function(Value) Library:SetNotifySide(Value) end,
+})
+
+MenuGroup:AddDropdown("DPIDropdown", {
+    Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" }, Default = "100%", Text = "DPI Scale",
+    Callback = function(Value)
+        Value = Value:gsub("%%", "")
+        Library:SetDPIScale(tonumber(Value))
+    end,
+})
+
+MenuGroup:AddDivider()
+
+MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", {
+    Default = "RightShift", NoUI = true, Text = "Menu keybind",
+})
+
+MenuGroup:AddButton({
+    Text = "Unload Script",
+    Func = function()
+        for key in pairs(threads) do stopLoop(key) end
+        if _G.AntiAFKConn then _G.AntiAFKConn:Disconnect() end
+        Library:Unload()
+    end,
+})
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+-- ========================
+-- SETUP ADDON
+-- ========================
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("RilzzHub")
+SaveManager:SetFolder("RilzzHub/configs")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+SaveManager:LoadAutoloadConfig()
+
+Library:Notify({
+    Title       = "Rilzz Hub",
+    Description = "Script berhasil diload! v1.0",
+    Time        = 3,
+})
