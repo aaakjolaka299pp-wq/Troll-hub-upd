@@ -268,23 +268,31 @@ MainRight:AddSlider("AutoGetBrainrotDelay", {
 
 MainRight:AddDivider()
 
--- INSTANT LEXUS
-MainRight:AddToggle("InstantNexus", {
-    Text    = "Instant Nexus",
+-- INSTANT GET BEST RARITY
+MainRight:AddToggle("InstantBestRarity", {
+    Text    = "Instant Get Best Rarity",
     Default = false,
     Tooltip = "Spam GetBoxAndBrainrot dengan nilai max (math.huge)",
     Callback = function(state)
         if state then
-            startLoop("InstantNexus", function()
+            startLoop("InstantBestRarity", function()
                 BrainrotEvent:FireServer({ "GetBoxAndBrainrot", LocalPlayer, math.huge })
-            end, function() return Options.InstantNexusDelay.Value end)
+            end, function()
+                return Options.InstantBestRarityDelay.Value
+            end)
         else
-            stopLoop("InstantNexus")
+            stopLoop("InstantBestRarity")
         end
     end,
 })
-MainRight:AddSlider("InstantNexusDelay", {
-    Text = "Instant Nexus Delay", Default = 0, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+
+MainRight:AddSlider("InstantBestRarityDelay", {
+    Text = "Instant Get Best Rarity Delay",
+    Default = 0,
+    Min = 0,
+    Max = 5,
+    Rounding = 1,
+    Suffix = "s",
 })
 
 MainRight:AddDivider()
