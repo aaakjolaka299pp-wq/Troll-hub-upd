@@ -100,43 +100,70 @@ MainLeft:AddSlider("AutoCollectCashDelay", {
 MainLeft:AddDivider()
 
 -- AUTO FARM
-local function doAction()
-    local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local HRP = Character:WaitForChild("HumanoidRootPart")
-
-    -- 1. Teleport Awal
-    HRP.CFrame = CFrame.new(-45.0, 33.2, -305.9)
-    task.wait()
-
-    -- 2. TP Guard
-    RemoteFolder:WaitForChild("game.yeet.tpToGuard"):InvokeServer()
-    task.wait()
-
-    -- 3. Throw V1
-    RemoteFolder:WaitForChild("game.yeet.throw"):InvokeServer(0.9070215386371794)
-    task.wait()
-
-    -- 4. Throw V2
-    RemoteFolder:WaitForChild("game.yeet.throw"):InvokeServer()
-    task.wait()
-
-    -- 5. Teleport Baru
-    HRP.CFrame = CFrame.new(3919.1, 36.1, -294.6)
-    task.wait()
-end
+local TweenService   = game:GetService("TweenService")
+local tpToGuard      = RemoteFolder:WaitForChild("game.yeet.tpToGuard")
+local throwRemote    = RemoteFolder:WaitForChild("game.yeet.throw")
+local farmTargetPos  = Vector3.new(-32.9, 33.1, -296.9)
+local farmDelay      = 0.1
+local farmTweenSpeed = 30
+local farmThread     = nil
+local farmRemoteThread = nil
 
 MainLeft:AddToggle("AutoFarm", {
     Text    = "Auto Farm",
     Default = false,
-    Tooltip = "Auto farm loop: TP → Guard → Throw → TP",
+    Tooltip = "Auto farm: Tween ke target + spam remote tpToGuard & throw",
     Callback = function(state)
         if state then
-            startLoop("AutoFarm", function()
-                doAction()
-            end, function() return 0 end)
+            -- Loop remote (background)
+            farmRemoteThread = task.spawn(function()
+                while Toggles["AutoFarm"] and Toggles["AutoFarm"].Value do
+                    pcall(function()
+                        tpToGuard:InvokeServer()
+                        throwRemote:InvokeServer(1)
+                    end)
+                    local d = farmDelay
+                    if d <= 0 then task.wait() else task.wait(d) end
+                end
+            end)
+            -- Loop tween (utama)
+            farmThread = task.spawn(function()
+                while Toggles["AutoFarm"] and Toggles["AutoFarm"].Value do
+                    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                    local hrp  = char:WaitForChild("HumanoidRootPart", 5)
+                    if hrp then
+                        local dist  = (hrp.Position - farmTargetPos).Magnitude
+                        local speed = farmTweenSpeed > 0 and farmTweenSpeed or 30
+                        local tween = TweenService:Create(
+                            hrp,
+                            TweenInfo.new(dist / speed, Enum.EasingStyle.Linear),
+                            { CFrame = CFrame.new(farmTargetPos) }
+                        )
+                        tween:Play()
+                        tween.Completed:Wait()
+                    end
+                    task.wait()
+                end
+            end)
         else
-            stopLoop("AutoFarm")
+            if farmThread then task.cancel(farmThread) farmThread = nil end
+            if farmRemoteThread then task.cancel(farmRemoteThread) farmRemoteThread = nil end
         end
+    end,
+})
+MainLeft:AddSlider("AutoFarmDelay", {
+    Text     = "Auto Farm Delay",
+    Default  = 0.1, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+    Callback = function(val) farmDelay = val end,
+})
+MainLeft:AddInput("AutoFarmSpeed", {
+    Text        = "Tween Speed",
+    Default     = "30",
+    Numeric     = true,
+    Finished    = true,
+    Placeholder = "Default: 30",
+    Callback    = function(val)
+        farmTweenSpeed = tonumber(val) or 30
     end,
 })
 
