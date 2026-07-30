@@ -1,0 +1,181 @@
+-- Rilzz Hub | WEB SWING
+-- UI Library: Obsidian
+
+local Players           = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer       = Players.LocalPlayer
+
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+
+local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+
+local utilities = ReplicatedStorage:WaitForChild("Utilities", 5)
+local webSwingRoll, webSwingRollFinish
+
+if utilities then
+    local typedRemote = utilities:WaitForChild("TypedRemote", 5)
+    if typedRemote then
+        webSwingRoll = typedRemote:WaitForChild("WebSwingRoll", 5)
+        webSwingRollFinish = typedRemote:WaitForChild("WebSwingRollFinish", 5)
+    end
+end
+
+local args = {
+    9999999999999999999999
+}
+
+local Window = Library:CreateWindow({
+    Title            = "Rilz HUB | WEB SWING",
+    Footer           = "v1.0",
+    Icon             = "zap",
+    NotifySide       = "Right",
+    ShowCustomCursor = true,
+    AutoShow         = true,
+})
+
+local Tabs = {
+    Main            = Window:AddTab("Main",        "zap"),
+    ["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
+
+local threads = {}
+
+local function startLoop(key, fn, getDelay)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+    threads[key] = task.spawn(function()
+        while Toggles[key] and Toggles[key].Value do
+            pcall(fn)
+            local d = getDelay and getDelay() or 0.1
+            if d <= 0 then task.wait() else task.wait(d) end
+        end
+    end)
+end
+
+local function stopLoop(key)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+end
+
+local MainLeft = Tabs.Main:AddLeftGroupbox("Automation", "cpu")
+
+MainLeft:AddToggle("AutoClick", {
+    Text    = "Auto 2x Click",
+    Default = false,
+    Tooltip = "Auto trigger tombol 2x Click pada MainGui",
+    Callback = function(state)
+        if state then
+            startLoop("AutoClick", function()
+                local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+                if playerGui then
+                    local mainGui = playerGui:FindFirstChild("MainGui")
+                    if mainGui then
+                        local targetButton = mainGui:FindFirstChild("2xButton")
+                        if targetButton and targetButton.Visible then
+                            if firesignal then
+                                firesignal(targetButton.Activated)
+                                firesignal(targetButton.MouseButton1Click)
+                            end
+                        end
+                    end
+                end
+            end, function() return Options.AutoClickDelay.Value end)
+        else
+            stopLoop("AutoClick")
+        end
+    end,
+})
+MainLeft:AddSlider("AutoClickDelay", {
+    Text = "Auto Click Delay", Default = 0.2, Min = 0, Max = 5, Rounding = 2, Suffix = "s",
+})
+
+MainLeft:AddDivider()
+
+MainLeft:AddToggle("AutoBrainrot", {
+    Text    = "Auto Brainrot",
+    Default = false,
+    Tooltip = "Auto invoke & fire WebSwingRoll remote",
+    Callback = function(state)
+        if state then
+            startLoop("AutoBrainrot", function()
+                if webSwingRoll and webSwingRollFinish then
+                    webSwingRoll:InvokeServer(unpack(args))
+                    task.wait(0.01)
+                    webSwingRollFinish:FireServer()
+                end
+            end, function() return Options.AutoBrainrotDelay.Value end)
+        else
+            stopLoop("AutoBrainrot")
+        end
+    end,
+})
+MainLeft:AddSlider("AutoBrainrotDelay", {
+    Text = "Auto Brainrot Delay", Default = 0.1, Min = 0, Max = 5, Rounding = 2, Suffix = "s",
+})
+
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu Settings", "wrench")
+
+MenuGroup:AddToggle("KeybindMenuOpen", {
+    Default  = Library.KeybindFrame.Visible,
+    Text     = "Open Keybind Menu",
+    Callback = function(Value) Library.KeybindFrame.Visible = Value end,
+})
+
+MenuGroup:AddToggle("ShowCustomCursor", {
+    Text = "Custom Cursor", Default = true,
+    Callback = function(Value) Library.ShowCustomCursor = Value end,
+})
+
+MenuGroup:AddDropdown("NotificationSide", {
+    Values = { "Left", "Right" }, Default = "Right", Text = "Notification Side",
+    Callback = function(Value) Library:SetNotifySide(Value) end,
+})
+
+MenuGroup:AddDropdown("DPIDropdown", {
+    Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" }, Default = "100%", Text = "DPI Scale",
+    Callback = function(Value)
+        Value = Value:gsub("%%", "")
+        Library:SetDPIScale(tonumber(Value))
+    end,
+})
+
+MenuGroup:AddDivider()
+
+MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", {
+    Default = "RightShift", NoUI = true, Text = "Menu keybind",
+})
+
+MenuGroup:AddButton({
+    Text = "Unload Script",
+    Func = function()
+        for key in pairs(threads) do stopLoop(key) end
+        Library:Unload()
+    end,
+})
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("RilzzHub")
+SaveManager:SetFolder("RilzzHub/configs")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+SaveManager:LoadAutoloadConfig()
+
+Library:Notify({
+    Title       = "Rilz HUB",
+    Description = "Script Loaded! (WEB SWING)",
+    Time        = 3,
+})
