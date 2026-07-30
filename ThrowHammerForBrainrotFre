@@ -8,7 +8,7 @@ local LocalPlayer       = Players.LocalPlayer
 -- ========================
 -- LOAD LIBRARY
 -- ========================
-local repo = "https://raw.githubusercontent.com/aaakjolaka299pp-wq/Gui/main/"
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 
 local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
