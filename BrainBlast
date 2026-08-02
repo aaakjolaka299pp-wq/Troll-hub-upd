@@ -1,7 +1,6 @@
 -- Rilzz Hub | BrainBlast
 -- UI Library: Obsidian 
 
-
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
@@ -11,7 +10,6 @@ local LocalPlayer       = Players.LocalPlayer
 -- LOAD LIBRARY
 -- ========================
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
-
 
 local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
@@ -89,6 +87,38 @@ end
 -- Alias untuk kompatibilitas
 local teleportToBlastZone = tpToBlastZone
 
+-- ========================
+-- COORDINATE DETECTOR SYSTEM
+-- ========================
+local targetCoordinates = {
+    Vector3.new(-19.7, 7.8, 10.2),
+    Vector3.new(-74.7, 7.8, 10.2),
+    Vector3.new(-134.5, 7.8, 10.2),
+    Vector3.new(34.8, 7.8, 10.2),
+    Vector3.new(88.5, 7.8, 10.2),
+}
+
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        pcall(function()
+            local char = LocalPlayer.Character
+            local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local currentPos = hrp.Position
+                for _, targetPos in ipairs(targetCoordinates) do
+                    if (currentPos - targetPos).Magnitude <= 5 then
+                        tpToBlastZone()
+                        Library:Notify({ Title = "Rilzz Hub", Description = "Posisi terdeteksi! TP ke Blast Zone...", Time = 2 })
+                        task.wait(1)
+                        break
+                    end
+                end
+            end
+        end)
+    end
+end)
+
 -- Cari blast button di PlayerGui pakai path exact
 local function findBlastButton()
     local hud = LocalPlayer.PlayerGui:FindFirstChild("HUD")
@@ -135,9 +165,6 @@ local function stopListenBrainrot()
     brainrotObtained    = false
 end
 
--- ========================
--- TAB: MAIN
--- ========================
 -- ========================
 -- TAB: MAIN
 -- ========================
@@ -591,7 +618,7 @@ local farmLoopThread = nil
 MainLeft:AddToggle("AutoFarmLoop", {
     Text    = "Auto Farm Loop",
     Default = false,
-    Tooltip = "Loop: TP Blast Zone → Klik blast → Auto Perfect → Klik tengah sampai dapat brainrot → TP lagi",
+    Tooltip = "Loop: TP Blast Zone 1x → Auto Perfect → Klik tengah sampai dapat brainrot → TP lagi",
     Callback = function(state)
         if state then
             -- Aktifkan Auto Perfect otomatis saat farm loop ON
@@ -600,39 +627,39 @@ MainLeft:AddToggle("AutoFarmLoop", {
                 Toggles["AutoPerfect"]:SetValue(true)
             end
 
-local VirtualInputManager = game:GetService("VirtualInputManager")
+            local VirtualInputManager = game:GetService("VirtualInputManager")
 
-local function sendCenterClick()
-    local camera = workspace.CurrentCamera
-    if not camera then return end
-    local vp = camera.ViewportSize
-    local cx  = vp.X / 2
-    local cy  = vp.Y / 2
-    pcall(function()
-        VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true,  game, 0)
-        task.wait(0.05)
-        VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, false, game, 0)
-    end)
-end
+            local function sendCenterClick()
+                local camera = workspace.CurrentCamera
+                if not camera then return end
+                local vp = camera.ViewportSize
+                local cx  = vp.X / 2
+                local cy  = vp.Y / 2
+                pcall(function()
+                    VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true,  game, 0)
+                    task.wait(0.05)
+                    VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, false, game, 0)
+                end)
+            end
 
-local clickLoopThread = nil
+            local clickLoopThread = nil
 
-local function startClickLoop()
-    if clickLoopThread then task.cancel(clickLoopThread) end
-    clickLoopThread = task.spawn(function()
-        while clickLoopThread ~= nil do
-            sendCenterClick()
-            task.wait(0.1)
-        end
-    end)
-end
+            local function startClickLoop()
+                if clickLoopThread then task.cancel(clickLoopThread) end
+                clickLoopThread = task.spawn(function()
+                    while clickLoopThread ~= nil do
+                        sendCenterClick()
+                        task.wait(0.1)
+                    end
+                end)
+            end
 
-local function stopClickLoop()
-    if clickLoopThread then
-        task.cancel(clickLoopThread)
-        clickLoopThread = nil
-    end
-end
+            local function stopClickLoop()
+                if clickLoopThread then
+                    task.cancel(clickLoopThread)
+                    clickLoopThread = nil
+                end
+            end
 
             farmLoopThread = task.spawn(function()
                 -- Jalankan auto click loop terus menerus di background
@@ -640,7 +667,7 @@ end
 
                 while Toggles["AutoFarmLoop"] and Toggles["AutoFarmLoop"].Value do
                     pcall(function()
-                        -- Step 1: TP ke Blast Zone
+                        -- Step 1: TP ke Blast Zone (1x)
                         local tpOk = teleportToBlastZone()
                         if not tpOk then
                             Library:Notify({ Title = "Rilzz Hub", Description = "Blast Zone tidak ditemukan, retry...", Time = 2 })
@@ -672,10 +699,6 @@ end
                             task.wait(0.1)
                             elapsed = elapsed + 0.1
                         end
-
-                        -- Step 5: TP kembali ke Blast Zone (next loop)
-                        tpToBlastZone()
-                        task.wait(0.3)
                     end)
                 end
 
@@ -703,8 +726,6 @@ end
         end
     end,
 })
-
-
 
 -- ========================
 -- TAB: SHOP
@@ -740,7 +761,6 @@ ShopLeft:AddToggle("AutoBuyBook", {
     Callback = function(state)
         if state then
             startLoop("AutoBuyBook", function()
-                -- Cek apakah ada yang dipilih
                 local hasSelected = false
                 for _, v in pairs(selectedBooks) do
                     if v then hasSelected = true break end
@@ -748,12 +768,10 @@ ShopLeft:AddToggle("AutoBuyBook", {
 
                 local list = {}
                 if hasSelected then
-                    -- Hanya beli yang dicentang
                     for name, active in pairs(selectedBooks) do
                         if active then table.insert(list, name) end
                     end
                 else
-                    -- Tidak ada yang dipilih = beli semua
                     list = BOOK_LIST
                 end
 
@@ -804,7 +822,6 @@ ShopRight:AddToggle("AutoUpgradeBrainrot", {
                 end
 
                 if hasSelected then
-                    -- Upgrade yang dipilih saja
                     for displayName, active in pairs(selectedPads) do
                         if active then
                             local g, i = displayName:match("Floor (%d+) Pad (%d+)")
@@ -817,7 +834,6 @@ ShopRight:AddToggle("AutoUpgradeBrainrot", {
                         end
                     end
                 else
-                    -- Tidak ada yang dipilih = upgrade semua
                     for group = 1, 3 do
                         for index = 1, 8 do
                             pcall(function()
@@ -922,7 +938,7 @@ end
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ClickLoopGui"
 screenGui.ResetOnSpawn = false
-screenGui.Enabled = false -- hidden by default, toggle dari Obsidian
+screenGui.Enabled = false
 screenGui.Parent = playerGui
 
 local frame = Instance.new("Frame")
