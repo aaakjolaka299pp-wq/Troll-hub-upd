@@ -1,0 +1,787 @@
+-- Rilzz Hub | Ultra Max Speed Auto Wins
+-- UI Library: Obsidian
+
+local Players             = game:GetService("Players")
+local RunService          = game:GetService("RunService")
+local ReplicatedStorage   = game:GetService("ReplicatedStorage")
+local UserInputService    = game:GetService("UserInputService")
+local Stats               = game:GetService("Stats")
+local TeleportService     = game:GetService("TeleportService")
+local MarketplaceService  = game:GetService("MarketplaceService")
+local HttpService         = game:GetService("HttpService")
+local VirtualUser         = game:GetService("VirtualUser")
+local Workspace           = game:GetService("Workspace")
+
+local LocalPlayer         = Players.LocalPlayer
+
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+
+local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+
+-- Variables & Coordinates
+local scanCoords = Vector3.new(-1.90, 5.73, 721.41)
+local returnCoords = Vector3.new(-0.65, 5.73, -584.89)
+
+local flyBV, flyBG, flyConn = nil, nil, nil
+local antiAfkConn = nil
+
+local CurrentFPS = 60
+local _frames = 0
+local _lastTick = tick()
+
+RunService.RenderStepped:Connect(function()
+    _frames = _frames + 1
+    local now = tick()
+    if now - _lastTick >= 1 then
+        CurrentFPS = math.floor(_frames / (now - _lastTick))
+        _frames = 0
+        _lastTick = now
+    end
+end)
+
+local CurrentPing = 0
+local function ReadPing()
+    local ok, val = pcall(function()
+        return math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue())
+    end)
+    if ok and val then CurrentPing = val end
+    return CurrentPing
+end
+
+-- Remote Events
+local Events = ReplicatedStorage:WaitForChild("Events", 5)
+local RequestSlotUpgrade = Events and Events:FindFirstChild("RequestSlotUpgrade")
+local PurchasePower = Events and Events:FindFirstChild("PurchasePower")
+local PurchaseSpeed = Events and Events:FindFirstChild("PurchaseSpeed")
+local BuyTool = Events and Events:FindFirstChild("BuyTool")
+local RequestRebirth = Events and Events:FindFirstChild("RequestRebirth")
+
+-- Tools List
+local availableTools = {}
+pcall(function()
+    local toolsFolder = ReplicatedStorage:WaitForChild("Tools", 5)
+    if toolsFolder then
+        for _, tool in pairs(toolsFolder:GetChildren()) do
+            table.insert(availableTools, tool.Name)
+        end
+    end
+end)
+if #availableTools == 0 then
+    availableTools = { "Scissors", "Hammer", "Axe" }
+end
+
+local selectedToolsList = {}
+
+-- Helpers
+local function GetHumanoid()
+    local char = LocalPlayer.Character
+    return char and char:FindFirstChildOfClass("Humanoid") or nil
+end
+
+local function GetRoot()
+    local char = LocalPlayer.Character
+    return char and char:FindFirstChild("HumanoidRootPart") or nil
+end
+
+local function Fmt(n)
+    return string.format("%.1f", tonumber(n) or 0)
+end
+
+local function teleportTo(pos)
+    local root = GetRoot()
+    if root then
+        if typeof(pos) == "Vector3" then
+            root.CFrame = CFrame.new(pos)
+        elseif typeof(pos) == "CFrame" then
+            root.CFrame = pos
+        end
+    end
+end
+
+local function triggerStealPrompt(targetPart)
+    pcall(function()
+        local parentObj = targetPart:IsA("Model") and targetPart or targetPart.Parent
+        if parentObj then
+            for _, prompt in pairs(parentObj:GetDescendants()) do
+                if prompt:IsA("ProximityPrompt") then
+                    prompt.HoldDuration = 0
+                    if fireproximityprompt then
+                        fireproximityprompt(prompt)
+                    else
+                        prompt:InputHoldBegin()
+                        task.wait(0.05)
+                        prompt:InputHoldEnd()
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function findTargetByKeyword(keyword)
+    local bestTarget = nil
+    local shortestDistance = math.huge
+
+    for _, descendant in pairs(Workspace:GetDescendants()) do
+        if descendant:IsA("TextLabel") or descendant:IsA("TextMesh") or descendant:IsA("SurfaceGui") or descendant:IsA("BillboardGui") then
+            local textContent = ""
+            if descendant:IsA("TextLabel") then
+                textContent = descendant.Text
+            elseif descendant:IsA("GuiObject") and descendant:FindFirstChildWhichIsA("TextLabel") then
+                textContent = descendant:FindFirstChildWhichIsA("TextLabel").Text
+            end
+
+            if string.find(textContent:lower(), keyword:lower()) then
+                local targetPart = nil
+                local p = descendant.Parent
+                while p and p ~= Workspace do
+                    if p:IsA("Model") and (p.PrimaryPart or p:FindFirstChildWhichIsA("BasePart")) then
+                        targetPart = p.PrimaryPart or p:FindFirstChildWhichIsA("BasePart")
+                        break
+                    elseif p:IsA("BasePart") then
+                        targetPart = p
+                        break
+                    end
+                    p = p.Parent
+                end
+
+                if targetPart then
+                    local dist = (targetPart.Position - scanCoords).Magnitude
+                    if dist < 150 and dist < shortestDistance then
+                        shortestDistance = dist
+                        bestTarget = targetPart
+                    end
+                end
+            end
+        end
+    end
+    return bestTarget
+end
+
+local function getMyPlot()
+    for _, obj in pairs(Workspace:GetChildren()) do
+        if string.find(obj.Name, "Plot_") then
+            if string.find(obj.Name, LocalPlayer.Name) or string.find(obj.Name, "Rilzz_Hub") then
+                return obj
+            end
+        end
+    end
+    return nil
+end
+
+local threads = {}
+
+local function startLoop(key, fn, getDelay)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+    threads[key] = task.spawn(function()
+        while Toggles[key] and Toggles[key].Value do
+            pcall(fn)
+            local d = getDelay and getDelay() or 0.1
+            if d <= 0 then task.wait() else task.wait(d) end
+        end
+    end)
+end
+
+local function stopLoop(key)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+end
+
+local function StopFly()
+    pcall(function()
+        if flyConn then flyConn:Disconnect() flyConn = nil end
+        if flyBV then flyBV:Destroy() flyBV = nil end
+        if flyBG then flyBG:Destroy() flyBG = nil end
+        local hum = GetHumanoid()
+        if hum then hum.PlatformStand = false end
+    end)
+end
+
+local function StartFly()
+    local root = GetRoot()
+    local hum = GetHumanoid()
+    if not root or not hum then return end
+
+    pcall(function()
+        flyBV = Instance.new("BodyVelocity")
+        flyBV.Name = "RilzzFlyVelocity"
+        flyBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        flyBV.Velocity = Vector3.zero
+        flyBV.Parent = root
+
+        flyBG = Instance.new("BodyGyro")
+        flyBG.Name = "RilzzFlyGyro"
+        flyBG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+        flyBG.P = 9e4
+        flyBG.CFrame = root.CFrame
+        flyBG.Parent = root
+
+        hum.PlatformStand = true
+
+        flyConn = RunService.RenderStepped:Connect(function()
+            if not Toggles.Fly or not Toggles.Fly.Value or not flyBV or not flyBG then return end
+            local cam = Workspace.CurrentCamera
+            local dir = Vector3.zero
+
+            if UserInputService.KeyboardEnabled then
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0, 1, 0) end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir = dir - Vector3.new(0, 1, 0) end
+            end
+
+            local h = GetHumanoid()
+            if h then
+                if h.MoveDirection.Magnitude > 0 then dir = dir + h.MoveDirection end
+                if h.Jump then dir = dir + Vector3.new(0, 1, 0) end
+            end
+
+            if dir.Magnitude > 0 then
+                flyBV.Velocity = dir.Unit * (Options.FlySpeed and Options.FlySpeed.Value or 60)
+            else
+                flyBV.Velocity = Vector3.zero
+            end
+            flyBG.CFrame = cam.CFrame
+        end)
+    end)
+end
+
+-- Window & Tabs
+local Window = Library:CreateWindow({
+    Title            = "Rilzz Hub | Ultra Max Speed Auto Wins",
+    Footer           = "v7.0.0",
+    Icon             = "zap",
+    NotifySide       = "Right",
+    ShowCustomCursor = true,
+    AutoShow         = true,
+})
+
+local Tabs = {
+    Main            = Window:AddTab("Main Features",  "zap"),
+    Player          = Window:AddTab("Player Features","user"),
+    Stats           = Window:AddTab("Player Info",    "activity"),
+    ["UI Settings"] = Window:AddTab("UI Settings",    "settings"),
+}
+
+-- Groups Main Tab
+local AutoFarmGroup = Tabs.Main:AddLeftGroupbox("Auto Farm Brainrots", "cpu")
+local ToolsGroup    = Tabs.Main:AddLeftGroupbox("Buy Tools Feature", "shopping-cart")
+local BaseAutoGroup = Tabs.Main:AddRightGroupbox("Base Automation", "sliders")
+
+-- 1. AUTO FARM GODLY
+AutoFarmGroup:AddToggle("AutoFarmGodly", {
+    Text = "Auto Farm Godly", Default = false, Tooltip = "Otomatis Farm Godly",
+    Callback = function(state)
+        if state then
+            startLoop("AutoFarmGodly", function()
+                teleportTo(scanCoords)
+                task.wait(0.5)
+                local targetPart = findTargetByKeyword("godly")
+                if targetPart then
+                    teleportTo(targetPart.CFrame + Vector3.new(0, 1.5, 0))
+                    task.wait(0.2)
+                    triggerStealPrompt(targetPart)
+                    task.wait(0.3)
+                    teleportTo(returnCoords)
+                    task.wait(0.8)
+                else
+                    teleportTo(returnCoords)
+                end
+            end, function() return Options.GodlyDelay and Options.GodlyDelay.Value or 0.5 end)
+        else
+            stopLoop("AutoFarmGodly")
+        end
+    end,
+})
+AutoFarmGroup:AddSlider("GodlyDelay", {
+    Text = " Delay (s)", Default = 0.5, Min = 0.1, Max = 5, Rounding = 1, Compact = true
+})
+
+-- 2. AUTO FARM OG
+AutoFarmGroup:AddToggle("AutoFarmOG", {
+    Text = "Auto Farm OG", Default = false, Tooltip = "Otomatis Farm OG",
+    Callback = function(state)
+        if state then
+            startLoop("AutoFarmOG", function()
+                teleportTo(scanCoords)
+                task.wait(0.5)
+                local targetPart = findTargetByKeyword("og")
+                if targetPart then
+                    teleportTo(targetPart.CFrame + Vector3.new(0, 1.5, 0))
+                    task.wait(0.2)
+                    triggerStealPrompt(targetPart)
+                    task.wait(0.3)
+                    teleportTo(returnCoords)
+                    task.wait(0.8)
+                else
+                    teleportTo(returnCoords)
+                end
+            end, function() return Options.OGDelay and Options.OGDelay.Value or 0.5 end)
+        else
+            stopLoop("AutoFarmOG")
+        end
+    end,
+})
+AutoFarmGroup:AddSlider("OGDelay", {
+    Text = "  Delay (s)", Default = 0.5, Min = 0.1, Max = 5, Rounding = 1, Compact = true
+})
+
+-- BUY TOOLS FEATURE
+ToolsGroup:AddDropdown("ToolsDropdown", {
+    Values = availableTools,
+    Default = {},
+    Multi = true,
+    Text = "Pilih Tools (Multi Select)",
+    Tooltip = "Pilih Tools yang ingin dibeli",
+    Callback = function(selected)
+        selectedToolsList = selected
+    end
+})
+
+ToolsGroup:AddButton({
+    Text = "Buy Tools (Beli Tool Yang Dipilih)",
+    Func = function()
+        pcall(function()
+            if BuyTool then
+                if type(selectedToolsList) == "table" then
+                    for toolName, isSelected in pairs(selectedToolsList) do
+                        if isSelected == true then
+                            BuyTool:FireServer(toolName)
+                            task.wait(0.05)
+                        elseif type(toolName) == "number" and type(isSelected) == "string" then
+                            BuyTool:FireServer(isSelected)
+                            task.wait(0.05)
+                        end
+                    end
+                elseif type(selectedToolsList) == "string" then
+                    BuyTool:FireServer(selectedToolsList)
+                end
+            end
+        end)
+    end
+})
+
+-- BASE AUTOMATION
+BaseAutoGroup:AddSlider("MaxFloorInput", {
+    Text = "Jumlah Max Floor", Default = 10, Min = 1, Max = 50, Rounding = 0, Compact = false
+})
+
+-- 3. AUTO COLLECT CASH
+BaseAutoGroup:AddToggle("AutoCollectCash", {
+    Text = "Auto Collect Cash", Default = false, Tooltip = "Collect Cash Floor 1 sampai Max Floor",
+    Callback = function(state)
+        if state then
+            startLoop("AutoCollectCash", function()
+                local hrp = GetRoot()
+                local myPlot = getMyPlot()
+                local maxFloor = Options.MaxFloorInput and Options.MaxFloorInput.Value or 10
+
+                if hrp and myPlot then
+                    for floorNum = 1, maxFloor do
+                        if not Toggles.AutoCollectCash.Value then break end
+                        local floorObj = myPlot:FindFirstChild("Floor" .. floorNum)
+                        if floorObj then
+                            local slotsFolder = floorObj:FindFirstChild("Slots")
+                            if slotsFolder then
+                                for slotNum = 1, 10 do
+                                    if not Toggles.AutoCollectCash.Value then break end
+                                    local slotObj = slotsFolder:FindFirstChild("Slot" .. slotNum)
+                                    if slotObj then
+                                        local collectBtn = slotObj:FindFirstChild("CollectButton")
+                                        local touchPart = collectBtn and collectBtn:FindFirstChild("Part")
+                                        if touchPart and firetouchinterest then
+                                            firetouchinterest(hrp, touchPart, 0)
+                                            firetouchinterest(hrp, touchPart, 1)
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        task.wait(0.005)
+                    end
+                end
+            end, function() return Options.CollectDelay and Options.CollectDelay.Value or 0.05 end)
+        else
+            stopLoop("AutoCollectCash")
+        end
+    end,
+})
+BaseAutoGroup:AddSlider("CollectDelay", {
+    Text = "  Delay (s)", Default = 0.05, Min = 0.01, Max = 1, Rounding = 2, Compact = true
+})
+
+-- 4. AUTO UPGRADE
+BaseAutoGroup:AddToggle("AutoUpgradeSlots", {
+    Text = "Auto Upgrade Slots", Default = false, Tooltip = "Otomatis Upgrade Slot Floor",
+    Callback = function(state)
+        if state then
+            startLoop("AutoUpgradeSlots", function()
+                if RequestSlotUpgrade then
+                    local maxFloor = Options.MaxFloorInput and Options.MaxFloorInput.Value or 10
+                    for floorNum = 1, maxFloor do
+                        if not Toggles.AutoUpgradeSlots.Value then break end
+                        for slotNum = 1, 10 do
+                            if not Toggles.AutoUpgradeSlots.Value then break end
+                            RequestSlotUpgrade:FireServer("Floor" .. floorNum, "Slot" .. slotNum)
+                            task.wait(0.01)
+                        end
+                    end
+                end
+            end, function() return Options.UpgradeDelay and Options.UpgradeDelay.Value or 0.1 end)
+        else
+            stopLoop("AutoUpgradeSlots")
+        end
+    end,
+})
+BaseAutoGroup:AddSlider("UpgradeDelay", {
+    Text = " Delay (s)", Default = 0.1, Min = 0.01, Max = 1, Rounding = 2, Compact = true
+})
+
+-- 5. AUTO PURCHASE POWER
+BaseAutoGroup:AddToggle("AutoPurchasePower", {
+    Text = "Auto Purchase Power", Default = false, Tooltip = "Otomatis Upgrade Power",
+    Callback = function(state)
+        if state then
+            startLoop("AutoPurchasePower", function()
+                if PurchasePower then 
+                    local amount = Options.PowerAmount and Options.PowerAmount.Value or 10
+                    PurchasePower:FireServer(amount) 
+                end
+            end, function() return Options.PowerDelay and Options.PowerDelay.Value or 0.05 end)
+        else
+            stopLoop("AutoPurchasePower")
+        end
+    end,
+})
+BaseAutoGroup:AddSlider("PowerAmount", {
+    Text = " Power Amount", Default = 10, Min = 1, Max = 100, Rounding = 0, Compact = true
+})
+BaseAutoGroup:AddSlider("PowerDelay", {
+    Text = "  Delay (s)", Default = 0.05, Min = 0.01, Max = 1, Rounding = 2, Compact = true
+})
+
+-- 6. AUTO PURCHASE SPEED
+BaseAutoGroup:AddToggle("AutoPurchaseSpeed", {
+    Text = "Auto Purchase Speed", Default = false, Tooltip = "Otomatis Upgrade Speed",
+    Callback = function(state)
+        if state then
+            startLoop("AutoPurchaseSpeed", function()
+                if PurchaseSpeed then 
+                    local amount = Options.SpeedAmount and Options.SpeedAmount.Value or 10
+                    PurchaseSpeed:FireServer(amount) 
+                end
+            end, function() return Options.SpeedDelay and Options.SpeedDelay.Value or 0.05 end)
+        else
+            stopLoop("AutoPurchaseSpeed")
+        end
+    end,
+})
+BaseAutoGroup:AddSlider("SpeedAmount", {
+    Text = " Speed Amount", Default = 10, Min = 1, Max = 100, Rounding = 0, Compact = true
+})
+BaseAutoGroup:AddSlider("SpeedDelay", {
+    Text = "Delay (s)", Default = 0.05, Min = 0.01, Max = 1, Rounding = 2, Compact = true
+})
+
+-- 7. AUTO REBIRTH
+BaseAutoGroup:AddToggle("AutoRebirth", {
+    Text = "Auto Rebirth", Default = false, Tooltip = "Otomatis Rebirth",
+    Callback = function(state)
+        if state then
+            startLoop("AutoRebirth", function()
+                if RequestRebirth then RequestRebirth:FireServer() end
+            end, function() return Options.RebirthDelay and Options.RebirthDelay.Value or 0.1 end)
+        else
+            stopLoop("AutoRebirth")
+        end
+    end,
+})
+BaseAutoGroup:AddSlider("RebirthDelay", {
+    Text = " Delay (s)", Default = 0.1, Min = 0.05, Max = 2, Rounding = 2, Compact = true
+})
+
+-- Groups Player Tab
+local MovementGroup  = Tabs.Player:AddLeftGroupbox("Movement Modifications", "move")
+local CharacterGroup = Tabs.Player:AddLeftGroupbox("Character", "user")
+local PhysicsGroup   = Tabs.Player:AddRightGroupbox("Physics Modifications", "shield")
+local TeleportGroup  = Tabs.Player:AddRightGroupbox("Teleport", "map-pin")
+local UtilityGroup   = Tabs.Player:AddRightGroupbox("Utility", "wrench")
+
+-- MOVEMENT
+MovementGroup:AddSlider("WalkSpeed", {
+    Text = "WalkSpeed", Default = 16, Min = 16, Max = 500, Rounding = 0,
+    Callback = function(v)
+        local hum = GetHumanoid()
+        if hum and not (Toggles.Sprint and Toggles.Sprint.Value) then hum.WalkSpeed = v end
+    end
+})
+
+MovementGroup:AddSlider("JumpPower", {
+    Text = "JumpPower", Default = 50, Min = 50, Max = 500, Rounding = 0,
+    Callback = function(v)
+        local hum = GetHumanoid()
+        if hum then hum.UseJumpPower = true hum.JumpPower = v end
+    end
+})
+
+MovementGroup:AddSlider("Gravity", {
+    Text = "Gravity", Default = 196, Min = 0, Max = 300, Rounding = 0,
+    Callback = function(v) Workspace.Gravity = v end
+})
+
+-- SPRINT
+MovementGroup:AddToggle("Sprint", {
+    Text = "Sprint", Default = false,
+    Callback = function(state)
+        local hum = GetHumanoid()
+        if hum then 
+            hum.WalkSpeed = state and (Options.SprintSpeed and Options.SprintSpeed.Value or 60) or (Options.WalkSpeed and Options.WalkSpeed.Value or 16) 
+        end
+    end
+})
+MovementGroup:AddSlider("SprintSpeed", { 
+    Text = "Sprint Speed", Default = 60, Min = 20, Max = 300, Rounding = 0, Compact = true 
+})
+
+-- INF JUMP
+MovementGroup:AddToggle("InfJump", { Text = "Infinite Jump", Default = false })
+MovementGroup:AddSlider("JumpHeightPower", {
+    Text = "Inf Jump Power Mod", Default = 50, Min = 10, Max = 200, Rounding = 0, Compact = true
+})
+
+-- CHARACTER
+CharacterGroup:AddButton({
+    Text = "Reset Character",
+    Func = function()
+        local hum = GetHumanoid()
+        if hum then hum.Health = 0 end
+    end
+})
+
+CharacterGroup:AddButton({
+    Text = "Heal Character",
+    Func = function()
+        local hum = GetHumanoid()
+        if hum then hum.Health = hum.MaxHealth end
+    end
+})
+
+-- PHYSICS
+PhysicsGroup:AddToggle("Noclip", {
+    Text = "Noclip", Default = false,
+    Callback = function(state)
+        if state then
+            startLoop("Noclip", function()
+                local char = LocalPlayer.Character
+                if char then
+                    for _, v in pairs(char:GetDescendants()) do
+                        if v:IsA("BasePart") and v.CanCollide then v.CanCollide = false end
+                    end
+                end
+            end)
+        else
+            stopLoop("Noclip")
+        end
+    end
+})
+
+-- FLY
+PhysicsGroup:AddToggle("Fly", {
+    Text = "Fly", Default = false,
+    Callback = function(state)
+        if state then StartFly() else StopFly() end
+    end
+})
+PhysicsGroup:AddSlider("FlySpeed", { 
+    Text = "Fly Speed", Default = 60, Min = 10, Max = 300, Rounding = 0, Compact = true 
+})
+
+-- TELEPORT
+TeleportGroup:AddToggle("ClickTeleport", { Text = "Click Teleport (Key: F / Touch)", Default = false })
+TeleportGroup:AddSlider("TeleportOffset", {
+    Text = "TP Height Offset", Default = 3, Min = 0, Max = 20, Rounding = 1, Compact = true
+})
+
+TeleportGroup:AddButton({
+    Text = "Save Position",
+    Func = function()
+        local root = GetRoot()
+        if root then savedPosition = root.CFrame end
+    end
+})
+
+TeleportGroup:AddButton({
+    Text = "Teleport To Saved Position",
+    Func = function()
+        local root = GetRoot()
+        if root and savedPosition then root.CFrame = savedPosition end
+    end
+})
+
+-- UTILITY
+UtilityGroup:AddToggle("AntiAFK", {
+    Text = "Anti AFK", Default = false,
+    Callback = function(state)
+        if state then
+            pcall(function()
+                antiAfkConn = LocalPlayer.Idled:Connect(function()
+                    pcall(function()
+                        VirtualUser:CaptureController()
+                        VirtualUser:ClickButton2(Vector2.new())
+                    end)
+                end)
+            end)
+        else
+            pcall(function() if antiAfkConn then antiAfkConn:Disconnect() antiAfkConn = nil end end)
+        end
+    end
+})
+
+UtilityGroup:AddButton({
+    Text = "Rejoin Server",
+    Func = function()
+        pcall(function() TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer) end)
+    end
+})
+
+UtilityGroup:AddButton({
+    Text = "Server Hop",
+    Func = function()
+        task.spawn(function()
+            local ok = pcall(function()
+                local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+                local data = HttpService:JSONDecode(game:HttpGet(url))
+                local list = {}
+                for _, srv in ipairs(data.data or {}) do
+                    if type(srv.id) == "string" and srv.id ~= game.JobId and srv.playing and srv.maxPlayers and srv.playing < srv.maxPlayers then
+                        table.insert(list, srv.id)
+                    end
+                end
+                if #list > 0 then
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, list[math.random(1, #list)], LocalPlayer)
+                else
+                    TeleportService:Teleport(game.PlaceId, LocalPlayer)
+                end
+            end)
+            if not ok then pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end) end
+        end)
+    end
+})
+
+-- STATS TAB
+local StatsGroup = Tabs.Stats:AddLeftGroupbox("Stats & Performance", "activity")
+local labelHealth = StatsGroup:AddLabel("Health: Memuat...")
+local labelFPS    = StatsGroup:AddLabel("FPS: 0")
+local labelPing   = StatsGroup:AddLabel("Ping: 0 ms")
+local labelPos    = StatsGroup:AddLabel("Posisi: Memuat...")
+
+task.spawn(function()
+    while task.wait(0.5) do
+        pcall(function()
+            local hum = GetHumanoid()
+            local root = GetRoot()
+            if hum then labelHealth:SetText("Health: " .. Fmt(hum.Health) .. "/" .. Fmt(hum.MaxHealth)) end
+            if root then labelPos:SetText(string.format("Pos: X: %.1f, Y: %.1f, Z: %.1f", root.Position.X, root.Position.Y, root.Position.Z)) end
+            labelFPS:SetText("FPS: " .. CurrentFPS)
+            labelPing:SetText("Ping: " .. ReadPing() .. " ms")
+        end)
+    end
+end)
+
+-- UI SETTINGS TAB
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu Settings", "wrench")
+
+MenuGroup:AddToggle("KeybindMenuOpen", {
+    Default  = Library.KeybindFrame.Visible,
+    Text     = "Open Keybind Menu",
+    Callback = function(Value) Library.KeybindFrame.Visible = Value end,
+})
+
+MenuGroup:AddToggle("ShowCustomCursor", {
+    Text = "Custom Cursor", Default = true,
+    Callback = function(Value) Library.ShowCustomCursor = Value end,
+})
+
+MenuGroup:AddDropdown("NotificationSide", {
+    Values = { "Left", "Right" }, Default = "Right", Text = "Notification Side",
+    Callback = function(Value) Library:SetNotifySide(Value) end,
+})
+
+MenuGroup:AddDropdown("DPIDropdown", {
+    Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" }, Default = "100%", Text = "DPI Scale",
+    Callback = function(Value)
+        Value = Value:gsub("%%", "")
+        Library:SetDPIScale(tonumber(Value))
+    end,
+})
+
+MenuGroup:AddDivider()
+
+MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", {
+    Default = "RightShift", NoUI = true, Text = "Menu keybind",
+})
+
+MenuGroup:AddButton({
+    Text = "Unload Script",
+    Func = function()
+        for key in pairs(threads) do stopLoop(key) end
+        StopFly()
+        if antiAfkConn then antiAfkConn:Disconnect() end
+        Library:Unload()
+    end,
+})
+
+-- Global Events
+UserInputService.JumpRequest:Connect(function()
+    if Toggles.InfJump and Toggles.InfJump.Value then
+        pcall(function()
+            local hum = GetHumanoid()
+            if hum then 
+                hum:ChangeState(Enum.HumanoidStateType.Jumping) 
+            end
+        end)
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe or not (Toggles.ClickTeleport and Toggles.ClickTeleport.Value) then return end
+    if input.KeyCode ~= Enum.KeyCode.F and input.UserInputType ~= Enum.UserInputType.Touch then return end
+    pcall(function()
+        local mouse = LocalPlayer:GetMouse()
+        local root  = GetRoot()
+        local offset = Options.TeleportOffset and Options.TeleportOffset.Value or 3
+        if root and mouse and mouse.Hit then
+            root.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, offset, 0))
+        end
+    end)
+end)
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("RilzzHub")
+SaveManager:SetFolder("RilzzHub/configs")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+SaveManager:LoadAutoloadConfig()
+
+Library:Notify({
+    Title       = "Rilzz Hub",
+    Description = "Script Loaded Successfully with Full Sliders!",
+    Time        = 3,
+})
