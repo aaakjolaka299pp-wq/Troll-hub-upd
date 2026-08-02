@@ -1,0 +1,418 @@
+-- Rilzz Hub | Jump Beanstalk For Squishy Dumpling
+-- UI Library: Obsidian
+
+local Players                = game:GetService("Players")
+local Workspace              = game:GetService("Workspace")
+local ReplicatedStorage      = game:GetService("ReplicatedStorage")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local LocalPlayer            = Players.LocalPlayer
+
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+
+local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+
+-- Remote Events
+local eventsFolder       = ReplicatedStorage:WaitForChild("Events", 5)
+local requestSlotUpgrade = eventsFolder and eventsFolder:FindFirstChild("RequestSlotUpgrade")
+local purchaseMoneyBoost = eventsFolder and eventsFolder:FindFirstChild("PurchaseMoneyBoost")
+local purchaseCarry      = eventsFolder and eventsFolder:FindFirstChild("PurchaseCarry")
+local requestRebirth     = eventsFolder and eventsFolder:FindFirstChild("RequestRebirth")
+local playerJumpRequest  = eventsFolder and eventsFolder:FindFirstChild("PlayerJumpRequest")
+
+-- Global Variables
+local originalCFrame = nil
+
+-- Helpers
+local function fireTouchFast(part, characterPart)
+    if firetouchinterest and part and characterPart then
+        task.spawn(function()
+            firetouchinterest(characterPart, part, 0)
+            task.wait()
+            firetouchinterest(characterPart, part, 1)
+        end)
+    end
+end
+
+local function getMyPlot()
+    local myName = string.lower(LocalPlayer.Name)
+    local myDisplayName = string.lower(LocalPlayer.DisplayName)
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+            local text = string.lower(obj.Text)
+            if (string.find(text, myName) or string.find(text, myDisplayName)) and string.find(text, "plot") then
+                local plotModel = obj:FindFirstAncestorWhichIsA("Model") or obj:FindFirstAncestorWhichIsA("Folder")
+                if plotModel then return plotModel end
+            end
+        end
+    end
+    return nil
+end
+
+local function collectCashFromMyPlotFast()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    local myPlot = getMyPlot()
+    if myPlot then
+        for _, obj in ipairs(myPlot:GetDescendants()) do
+            if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+                if string.find(obj.Text, "%$") then
+                    local parentPart = obj:FindFirstAncestorWhichIsA("BasePart")
+                    if parentPart then fireTouchFast(parentPart, hrp) end
+                end
+            end
+        end
+    end
+end
+
+local function forceInstantPickUp(part)
+    for _, prompt in ipairs(part:GetDescendants()) do
+        if prompt:IsA("ProximityPrompt") then
+            prompt.HoldDuration = 0
+            if fireproximityprompt then fireproximityprompt(prompt) end
+        end
+    end
+end
+
+local function isInsideBaseOrPlot(obj)
+    local current = obj
+    while current and current ~= Workspace do
+        local nameLower = string.lower(current.Name)
+        if string.find(nameLower, "plot") or string.find(nameLower, "base") or string.find(nameLower, "tycoon") or string.find(nameLower, "player") or string.find(nameLower, "house") then
+            return true
+        end
+        current = current.Parent
+    end
+    return false
+end
+
+local function findMythicalTargets()
+    local targets = {}
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+            if string.find(string.lower(obj.Text), "mythical") then
+                if not isInsideBaseOrPlot(obj) then
+                    local parentPart = obj:FindFirstAncestorWhichIsA("BasePart") or obj:FindFirstAncestorWhichIsA("Model")
+                    if parentPart and not isInsideBaseOrPlot(parentPart) then
+                        table.insert(targets, parentPart)
+                    end
+                end
+            end
+        end
+    end
+    return targets
+end
+
+-- Hook Proximity Prompt
+ProximityPromptService.PromptShown:Connect(function(prompt)
+    if Toggles.AutoFarmMythical and Toggles.AutoFarmMythical.Value then
+        prompt.HoldDuration = 0
+        if fireproximityprompt then fireproximityprompt(prompt) end
+    end
+end)
+
+-- Window & Tabs
+local Window = Library:CreateWindow({
+    Title            = "Rilzz Hub | Jump Beanstalk For Squishy Dumpling",
+    Footer           = "v1.0",
+    Icon             = "zap",
+    NotifySide       = "Right",
+    ShowCustomCursor = true,
+    AutoShow         = true,
+})
+
+local Tabs = {
+    Main            = Window:AddTab("Main",        "zap"),
+    ["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
+
+local threads = {}
+
+local function startLoop(key, fn, getDelay)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+    threads[key] = task.spawn(function()
+        while Toggles[key] and Toggles[key].Value do
+            pcall(fn)
+            local d = getDelay and getDelay() or 0.1
+            if d <= 0 then task.wait() else task.wait(d) end
+        end
+    end)
+end
+
+local function stopLoop(key)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+end
+
+-- Tab Main Groups
+local MainLeft  = Tabs.Main:AddLeftGroupbox("Automation", "cpu")
+local MainRight = Tabs.Main:AddRightGroupbox("Upgrades & Boosts", "sliders")
+
+-- AUTO FARM MYTHICAL
+MainLeft:AddToggle("AutoFarmMythical", {
+    Text    = "Auto Farm Mythical",
+    Default = false,
+    Tooltip = "Otomatis Farm Mythical Super Cepat",
+    Callback = function(state)
+        if state then
+            startLoop("AutoFarmMythical", function()
+                local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local mythicalItems = findMythicalTargets()
+                    if #mythicalItems > 0 then
+                        if not originalCFrame then originalCFrame = hrp.CFrame end
+                        for _, target in ipairs(mythicalItems) do
+                            if not Toggles.AutoFarmMythical.Value then break end
+                            local targetCFrame = nil
+                            local targetPart = nil
+                            if target:IsA("BasePart") then
+                                targetCFrame = target.CFrame
+                                targetPart = target
+                            elseif target:IsA("Model") then
+                                targetCFrame = target:GetPivot() or (target.PrimaryPart and target.PrimaryPart.CFrame)
+                                targetPart = target
+                            end
+
+                            if targetCFrame and targetPart then
+                                if not isInsideBaseOrPlot(targetPart) then
+                                    hrp.CFrame = targetCFrame * CFrame.new(0, 1.5, 0)
+                                    task.wait(0.02)
+                                    forceInstantPickUp(targetPart)
+                                    task.wait(0.05)
+                                    if originalCFrame then hrp.CFrame = originalCFrame end
+                                    task.wait(0.05)
+                                end
+                            end
+                        end
+                    end
+                else
+                    originalCFrame = nil
+                end
+            end, function() return Options.AutoFarmMythicalDelay.Value end)
+        else
+            stopLoop("AutoFarmMythical")
+            originalCFrame = nil
+        end
+    end,
+})
+MainLeft:AddSlider("AutoFarmMythicalDelay", {
+    Text = "Auto Farm Mythical Delay", Default = 0.2, Min = 0, Max = 5, Rounding = 2, Suffix = "s",
+})
+
+MainLeft:AddDivider()
+
+-- AUTO COLLECT CASH
+MainLeft:AddToggle("AutoCollectCash", {
+    Text    = "Auto Collect Cash (My Plot)",
+    Default = false,
+    Tooltip = "Otomatis Collect Cash pada plot milikmu",
+    Callback = function(state)
+        if state then
+            startLoop("AutoCollectCash", function()
+                collectCashFromMyPlotFast()
+            end, function() return Options.AutoCollectCashDelay.Value end)
+        else
+            stopLoop("AutoCollectCash")
+        end
+    end,
+})
+MainLeft:AddSlider("AutoCollectCashDelay", {
+    Text = "Auto Collect Cash Delay", Default = 0.05, Min = 0, Max = 5, Rounding = 2, Suffix = "s",
+})
+
+MainLeft:AddDivider()
+
+-- AUTO FAST JUMP
+MainLeft:AddToggle("AutoFastJump", {
+    Text    = "Auto Fast Jump",
+    Default = false,
+    Tooltip = "Train Jump Fast",
+    Callback = function(state)
+        if state then
+            startLoop("AutoFastJump", function()
+                if playerJumpRequest then
+                    task.spawn(function() playerJumpRequest:FireServer() end)
+                end
+            end, function() return Options.AutoFastJumpDelay.Value end)
+        else
+            stopLoop("AutoFastJump")
+        end
+    end,
+})
+MainLeft:AddSlider("AutoFastJumpDelay", {
+    Text = "Auto Fast Jump Delay", Default = 0.01, Min = 0, Max = 5, Rounding = 2, Suffix = "s",
+})
+
+MainLeft:AddDivider()
+
+-- AUTO REBIRTH
+MainLeft:AddToggle("AutoRebirth", {
+    Text    = "Auto Rebirth",
+    Default = false,
+    Tooltip = "Melakukan Rebirth secara otomatis",
+    Callback = function(state)
+        if state then
+            startLoop("AutoRebirth", function()
+                if requestRebirth then requestRebirth:FireServer() end
+            end, function() return Options.AutoRebirthDelay.Value end)
+        else
+            stopLoop("AutoRebirth")
+        end
+    end,
+})
+MainLeft:AddSlider("AutoRebirthDelay", {
+    Text = "Auto Rebirth Delay", Default = 0.5, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+-- AUTO UPGRADE MONEY BOOST
+MainRight:AddToggle("AutoMoneyBoost", {
+    Text    = "Auto Upgrade Money Boost",
+    Default = false,
+    Tooltip = "Upgrade Otomatis Money Boost",
+    Callback = function(state)
+        if state then
+            startLoop("AutoMoneyBoost", function()
+                if purchaseMoneyBoost then purchaseMoneyBoost:FireServer(10) end
+            end, function() return Options.AutoMoneyBoostDelay.Value end)
+        else
+            stopLoop("AutoMoneyBoost")
+        end
+    end,
+})
+MainRight:AddSlider("AutoMoneyBoostDelay", {
+    Text = "Auto Money Boost Delay", Default = 0.8, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+MainRight:AddDivider()
+
+-- AUTO UPGRADE CARRY
+MainRight:AddToggle("AutoCarry", {
+    Text    = "Auto Upgrade Carry",
+    Default = false,
+    Tooltip = "Otomatis Upgrade Carry",
+    Callback = function(state)
+        if state then
+            startLoop("AutoCarry", function()
+                if purchaseCarry then purchaseCarry:FireServer() end
+            end, function() return Options.AutoCarryDelay.Value end)
+        else
+            stopLoop("AutoCarry")
+        end
+    end,
+})
+MainRight:AddSlider("AutoCarryDelay", {
+    Text = "Auto Carry Delay", Default = 0.8, Min = 0, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+MainRight:AddDivider()
+
+-- AUTO SLOT UPGRADE
+MainRight:AddInput("MaxFloorInput", {
+    Default     = "1",
+    Numeric     = true,
+    Finished    = false,
+    Text        = "Target Max Floor",
+    Tooltip     = "Masukkan jumlah floor (Contoh: 2)",
+    Placeholder = "Angka (Cth: 1, 2, 3)",
+})
+
+MainRight:AddToggle("AutoFastUpgradeSlots", {
+    Text    = "Auto Fast Upgrade Slots",
+    Default = false,
+    Tooltip = "Otomatis Upgrade Slots berdasarkan target floor",
+    Callback = function(state)
+        if state then
+            startLoop("AutoFastUpgradeSlots", function()
+                if requestSlotUpgrade then
+                    local targetFloors = tonumber(Options.MaxFloorInput.Value) or 1
+                    for floorIndex = 1, targetFloors do
+                        if not Toggles.AutoFastUpgradeSlots.Value then break end
+                        local floorName = "Floor" .. floorIndex
+                        for slotIndex = 1, 10 do
+                            if not Toggles.AutoFastUpgradeSlots.Value then break end
+                            local slotName = "Slot" .. slotIndex
+                            task.spawn(function()
+                                requestSlotUpgrade:FireServer(floorName, slotName)
+                            end)
+                        end
+                    end
+                end
+            end, function() return Options.AutoFastUpgradeSlotsDelay.Value end)
+        else
+            stopLoop("AutoFastUpgradeSlots")
+        end
+    end,
+})
+MainRight:AddSlider("AutoFastUpgradeSlotsDelay", {
+    Text = "Auto Fast Upgrade Slots Delay", Default = 0.05, Min = 0, Max = 5, Rounding = 2, Suffix = "s",
+})
+
+-- UI SETTINGS TAB
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu Settings", "wrench")
+
+MenuGroup:AddToggle("KeybindMenuOpen", {
+    Default  = Library.KeybindFrame.Visible,
+    Text     = "Open Keybind Menu",
+    Callback = function(Value) Library.KeybindFrame.Visible = Value end,
+})
+
+MenuGroup:AddToggle("ShowCustomCursor", {
+    Text = "Custom Cursor", Default = true,
+    Callback = function(Value) Library.ShowCustomCursor = Value end,
+})
+
+MenuGroup:AddDropdown("NotificationSide", {
+    Values = { "Left", "Right" }, Default = "Right", Text = "Notification Side",
+    Callback = function(Value) Library:SetNotifySide(Value) end,
+})
+
+MenuGroup:AddDropdown("DPIDropdown", {
+    Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" }, Default = "100%", Text = "DPI Scale",
+    Callback = function(Value)
+        Value = Value:gsub("%%", "")
+        Library:SetDPIScale(tonumber(Value))
+    end,
+})
+
+MenuGroup:AddDivider()
+
+MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", {
+    Default = "RightShift", NoUI = true, Text = "Menu keybind",
+})
+
+MenuGroup:AddButton({
+    Text = "Unload Script",
+    Func = function()
+        for key in pairs(threads) do stopLoop(key) end
+        Library:Unload()
+    end,
+})
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("RilzzHub")
+SaveManager:SetFolder("RilzzHub/configs")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+SaveManager:LoadAutoloadConfig()
+
+Library:Notify({
+    Title       = "Rilzz Hub",
+    Description = "Script Loaded! (Jump Beanstalk For Squishy Dumpling)",
+    Time        = 3,
+})
