@@ -1,5 +1,6 @@
 -- Rilzz Hub | Become a Brainrot
--- UI Library: Obsidian (https://github.com/aaakjolaka299pp-wq/Gui)
+-- UI Library: Obsidian 
+
 
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,6 +11,7 @@ local LocalPlayer       = Players.LocalPlayer
 -- LOAD LIBRARY
 -- ========================
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+
 
 local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
@@ -60,26 +62,32 @@ local function stopLoop(key)
 end
 
 -- ========================
--- HELPERS
+-- TP DELAY (shared antara Auto TP on Brainrot & Farm Loop)
 -- ========================
+local brainrotTPDelay = 6  -- default 6 detik, diatur dari slider
 
 -- Teleport ke Blast Zone
-local function teleportToBlastZone()
-    local char    = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp     = char:FindFirstChild("HumanoidRootPart")
-    local zones   = workspace:FindFirstChild("Zones")
+local function tpToBlastZone()
+    local zones     = workspace:FindFirstChild("Zones")
     local blastZone = zones and zones:FindFirstChild("BlastZone")
     local blastArea = blastZone and (
         blastZone:FindFirstChild("BlastArea") or
         blastZone:FindFirstChild("SafeArea") or
         blastZone:FindFirstChild("Part")
     )
-    if hrp and blastArea and blastArea:IsA("BasePart") then
-        hrp.CFrame = blastArea.CFrame + Vector3.new(0, 5, 0)
-        return true
+    if blastArea and blastArea:IsA("BasePart") then
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp  = char:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = blastArea.CFrame + Vector3.new(0, 5, 0)
+            return true
+        end
     end
     return false
 end
+
+-- Alias untuk kompatibilitas
+local teleportToBlastZone = tpToBlastZone
 
 -- Cari blast button di PlayerGui pakai path exact
 local function findBlastButton()
@@ -91,7 +99,6 @@ local function findBlastButton()
     if btn and btn.Visible then return btn end
     return nil
 end
-
 
 -- Cek apakah brainrot sudah masuk backpack / character
 local brainrotConnections = {}
@@ -487,16 +494,28 @@ MainRight:AddToggle("AutoPerfect", {
 
 MainRight:AddDivider()
 
--- ========================
--- AUTO TP ON BRAINROT (standalone, tetap ada)
--- ========================
+-- SLIDER DELAY TP BRAINROT (shared antara Auto TP on Brainrot & Farm Loop)
+MainRight:AddSlider("BrainrotTPDelay", {
+    Text     = "Brainrot TP Delay",
+    Default  = 6,
+    Min      = 5,
+    Max      = 15,
+    Rounding = 0,
+    Suffix   = "s",
+    Tooltip  = "Delay sebelum TP ke Blast Zone setelah dapat brainrot (berlaku untuk Auto TP & Farm Loop)",
+    Callback = function(val) brainrotTPDelay = val end,
+})
+
+MainRight:AddDivider()
+
+-- AUTO TP ON BRAINROT (standalone)
 local autoTpActive   = false
 local tpConnections  = {}
 
 MainRight:AddToggle("AutoTpBrainrot", {
     Text    = "Auto TP on Brainrot",
     Default = false,
-    Tooltip = "Auto TP ke Blast Zone setiap kali dapat brainrot",
+    Tooltip = "Auto TP ke Blast Zone setelah dapat brainrot (delay dari slider)",
     Callback = function(state)
         autoTpActive = state
 
@@ -508,11 +527,16 @@ MainRight:AddToggle("AutoTpBrainrot", {
 
             local function onBrainrotAdded(child)
                 if not autoTpActive then return end
-                local n = child.Name:lower()
+                local n = child and child.Name and child.Name:lower() or ""
                 if n:find("brainrot") or n:find("brain rot") then
-                    task.wait(0.1)
-                    teleportToBlastZone()
-                    Library:Notify({ Title = "Rilzz Hub", Description = "TP ke Blast Zone! (" .. child.Name .. ")", Time = 2 })
+                    task.spawn(function()
+                        Library:Notify({ Title = "Rilzz Hub", Description = "Dapat brainrot! TP dalam " .. brainrotTPDelay .. "s...", Time = 3 })
+                        task.wait(brainrotTPDelay)
+                        if autoTpActive then
+                            tpToBlastZone()
+                            Library:Notify({ Title = "Rilzz Hub", Description = "TP ke Blast Zone!", Time = 2 })
+                        end
+                    end)
                 end
             end
 
@@ -628,7 +652,7 @@ end
                         -- Step 2: Pasang listener brainrot
                         brainrotObtained = false
                         listenBrainrot(function(name)
-                            Library:Notify({ Title = "Brainrot!", Description = "Dapat: " .. name, Time = 2 })
+                            Library:Notify({ Title = "Brainrot!", Description = "Dapat: " .. name .. " | TP dalam " .. brainrotTPDelay .. "s", Time = 3 })
                         end)
 
                         -- Step 3: Tunggu sampai brainrot dapat (tanpa batas waktu)
@@ -640,7 +664,17 @@ end
 
                         stopListenBrainrot()
 
-                        -- Step 4: TP kembali ke Blast Zone (next loop)
+                        -- Step 4: Tunggu delay sebelum TP (sama dengan slider)
+                        local elapsed = 0
+                        while elapsed < brainrotTPDelay
+                        and Toggles["AutoFarmLoop"]
+                        and Toggles["AutoFarmLoop"].Value do
+                            task.wait(0.1)
+                            elapsed = elapsed + 0.1
+                        end
+
+                        -- Step 5: TP kembali ke Blast Zone (next loop)
+                        tpToBlastZone()
                         task.wait(0.3)
                     end)
                 end
