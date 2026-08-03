@@ -707,7 +707,7 @@ MainLeft:AddToggle("AutoFarmLoop", {
                         local flyConn = nil
 
                         if hrp then
-                            local flyTargetHeight = hrp.CFrame + Vector3.new(0, -15, 0) -- Terbang tinggi 50 studs
+                            local flyTargetHeight = hrp.CFrame + Vector3.new(0, -25, 0) -- Terbang tinggi 50 studs
                             flyConn = RunService.Heartbeat:Connect(function()
                                 if hrp and hrp.Parent then
                                     hrp.Velocity = Vector3.zero
