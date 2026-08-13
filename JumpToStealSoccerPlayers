@@ -1,8 +1,7 @@
 -- =================================================================
 -- Rilzz Hub 👑
 -- By Rilzz
--- Auto-Farm & Automation Script (Optimized & Fixed Engine)
--- UI Framework: Obsidian Library (Official Repository)
+-- JUMP TO STEAL SOCCER PLAYERS
 -- =================================================================
 
 -- 1. LOAD OBSIDIAN UI LIBRARY
@@ -131,7 +130,7 @@ end
 
 local Window = Obsidian:CreateWindow({
     Title            = "Rilzz Hub 👑",
-    Footer           = "Map Scan Optimized Script | By Rilzz",
+    Footer           = " JUMP TO STEAL SOCCER PLAYERS | By Rilzz",
     Icon             = "zap",
     NotifySide       = "Right",
     ShowCustomCursor = true,
