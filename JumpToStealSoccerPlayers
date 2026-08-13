@@ -1,0 +1,304 @@
+-- =================================================================
+-- Rilzz Hub 👑
+-- By Rilzz
+-- Auto-Farm & Automation Script (Optimized & Fixed Engine)
+-- UI Framework: Obsidian Library (Official Repository)
+-- =================================================================
+
+-- 1. LOAD OBSIDIAN UI LIBRARY
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Obsidian = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+-- 2. SERVICES & CORE VARIABLES
+local Players           = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace         = game:GetService("Workspace")
+local VirtualUser       = game:GetService("VirtualUser")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- Anti-AFK (Bypass Idle Disconnect)
+LocalPlayer.Idled:Connect(function()
+    VirtualUser:Button2Down(Vector2.new(0, 0), Workspace.CurrentCamera.CFrame)
+    task.wait(1)
+    VirtualUser:Button2Up(Vector2.new(0, 0), Workspace.CurrentCamera.CFrame)
+end)
+
+-- Multi-Threading Loop Controller
+local activeThreads = {}
+
+local function setLoopState(key, enabled, loopFunc, delayTime)
+    if activeThreads[key] then
+        task.cancel(activeThreads[key])
+        activeThreads[key] = nil
+    end
+
+    if enabled then
+        activeThreads[key] = task.spawn(function()
+            while enabled do
+                pcall(loopFunc)
+                task.wait(delayTime or 0.3)
+            end
+        end)
+    end
+end
+
+-- 3. HELPER FUNCTIONS
+
+local function GetCharacter()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp  = char:FindFirstChild("HumanoidRootPart") or char:WaitForChild("HumanoidRootPart", 5)
+    local hum  = char:FindFirstChildOfClass("Humanoid") or char:WaitForChild("Humanoid", 5)
+    return char, hrp, hum
+end
+
+local function SafeTeleport(cframe)
+    local _, hrp, hum = GetCharacter()
+    if hrp and hum and hum.Health > 0 then
+        pcall(function()
+            hrp.CFrame = cframe
+        end)
+    end
+end
+
+local function MoveToolsToBackpack()
+    local char = GetCharacter()
+    if char then
+        for _, tool in ipairs(char:GetChildren()) do
+            if tool:IsA("Tool") then
+                pcall(function()
+                    tool.Parent = LocalPlayer:WaitForChild("Backpack", 2)
+                end)
+            end
+        end
+    end
+end
+
+-- Fast & Optimized ProximityPrompt Trigger
+local function TriggerNearbyPrompts(maxDistance)
+    local _, hrp = GetCharacter()
+    if not hrp then return end
+
+    maxDistance = maxDistance or 25
+
+    for _, descendant in ipairs(Workspace:GetDescendants()) do
+        if descendant:IsA("ProximityPrompt") and descendant.Enabled then
+            local parent = descendant.Parent
+            local pos    = nil
+
+            if parent:IsA("BasePart") then
+                pos = parent.Position
+            elseif parent:IsA("Model") and parent.PrimaryPart then
+                pos = parent.PrimaryPart.Position
+            elseif parent:IsA("Attachment") then
+                pos = parent.WorldPosition
+            end
+
+            if pos and (hrp.Position - pos).Magnitude <= maxDistance then
+                pcall(function()
+                    if fireproximityprompt then
+                        fireproximityprompt(descendant)
+                    else
+                        -- Fallback jika executor tidak support fireproximityprompt
+                        descendant:InputHoldBegin()
+                        task.wait(descendant.HoldDuration)
+                        descendant:InputHoldEnd()
+                    end
+                end)
+            end
+        end
+    end
+end
+
+-- Remote Finder Utility
+local function GetRemote(remoteName)
+    local shared = ReplicatedStorage:FindFirstChild("SharedModules")
+    if shared then
+        local net = shared:FindFirstChild("Network")
+        if net then
+            local remotes = net:FindFirstChild("Remotes")
+            if remotes then
+                return remotes:FindFirstChild(remoteName)
+            end
+        end
+    end
+    return nil
+end
+
+-- 4. GUI INITIALIZATION (Obsidian UI Engine)
+
+local Window = Obsidian:CreateWindow({
+    Title            = "Rilzz Hub 👑",
+    Footer           = "Map Scan Optimized Script | By Rilzz",
+    Icon             = "zap",
+    NotifySide       = "Right",
+    ShowCustomCursor = true,
+    AutoShow         = true,
+})
+
+-- TABS
+local Tabs = {
+    Main = Window:AddTab("Main Farm", "zap"),
+    Stats = Window:AddTab("Upgrades & Stats", "trending-up"),
+    Misc = Window:AddTab("Misc / Extra", "sliders"),
+    ["UI Settings"] = Window:AddTab("UI Settings", "settings")
+}
+
+-- 5. TAB LOGIC & CONTROLLERS
+
+-- === TAB 1: MAIN FARM ===
+local FarmGroup = Tabs.Main:AddLeftGroupbox("Automation Farm", "zap")
+
+FarmGroup:AddToggle("AutoFarmBest", {
+    Text    = "Auto Farm Best Zone (Spain / Top)",
+    Default = false,
+    Tooltip = "Loop teleport antara Zona Tertinggi dan Base Plot",
+    Callback = function(state)
+        setLoopState("AutoFarmBest", state, function()
+            local SpainTopCF = CFrame.new(198.1, 2240, -1316.9)
+            local BasePlotCF = CFrame.new(198.1, 3, 338.6)
+
+            -- Step 1: Teleport ke Zona Spain Top
+            SafeTeleport(SpainTopCF)
+            task.wait(0.3)
+
+            -- Step 2: Trigger Prompt
+            TriggerNearbyPrompts(30)
+            task.wait(0.2)
+
+            -- Step 3: Teleport Kembali ke Base Plot
+            SafeTeleport(BasePlotCF)
+            task.wait(0.3)
+
+            -- Step 4: Move Tools ke Backpack
+            MoveToolsToBackpack()
+        end, 0.5)
+    end
+})
+
+FarmGroup:AddToggle("AutoStealNearest", {
+    Text    = "Auto  Nearby Prompts",
+    Default = false,
+    Tooltip = "Otomatis ambil prompt terdekat secara berkala",
+    Callback = function(state)
+        setLoopState("AutoStealNearest", state, function()
+            TriggerNearbyPrompts(25)
+        end, 0.3)
+    end
+})
+
+-- === TAB 2: UPGRADES & STATS ===
+local StatsGroup = Tabs.Stats:AddLeftGroupbox("Auto Remotes", "coins")
+
+StatsGroup:AddToggle("CollectCash", {
+    Text    = "Auto Collect Cash",
+    Default = false,
+    Callback = function(state)
+        setLoopState("CollectCash", state, function()
+            local remote = GetRemote("Collect Earnings")
+            if remote then
+                for slot = 1, 10 do
+                    remote:FireServer(tostring(slot))
+                end
+            end
+        end, 0.5)
+    end
+})
+
+StatsGroup:AddToggle("UpgradeSpeed", {
+    Text    = "Auto Upgrade Jumps",
+    Default = false,
+    Callback = function(state)
+        setLoopState("UpgradeSpeed", state, function()
+            local remote = GetRemote("Buy Speed Upgrade")
+            if remote then
+                remote:FireServer(3)
+            end
+        end, 0.5)
+    end
+})
+
+StatsGroup:AddToggle("AutoRebirth", {
+    Text    = "Auto Rebirth",
+    Default = false,
+    Callback = function(state)
+        setLoopState("AutoRebirth", state, function()
+            local remote = GetRemote("Rebirth")
+            if remote then
+                remote:FireServer()
+            end
+        end, 1.0)
+    end
+})
+
+-- === TAB 3: MISC / EXTRA ===
+local MiscGroup = Tabs.Misc:AddLeftGroupbox("Quick Teleport", "map-pin")
+
+MiscGroup:AddButton({
+    Text = "Teleport to Spawn / Plot Area",
+    Func = function()
+        SafeTeleport(CFrame.new(198.1, 3, 338.6))
+        Obsidian:Notify({ Title = "Rilzz Hub", Description = "Teleported ke Base Plot!", Time = 2 })
+    end
+})
+
+MiscGroup:AddButton({
+    Text = "Teleport to Spain Zone (Best)",
+    Func = function()
+        SafeTeleport(CFrame.new(198.1, 2240, -1316.9))
+        Obsidian:Notify({ Title = "Rilzz Hub", Description = "Teleported ke Spain Zone Top!", Time = 2 })
+    end
+})
+
+-- === TAB 4: UI SETTINGS ===
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu Settings", "wrench")
+
+MenuGroup:AddToggle("ShowCustomCursor", {
+    Text = "Custom Cursor", Default = true,
+    Callback = function(Value) Obsidian.ShowCustomCursor = Value end,
+})
+
+MenuGroup:AddDropdown("NotificationSide", {
+    Values = { "Left", "Right" }, Default = "Right", Text = "Notification Side",
+    Callback = function(Value) Obsidian:SetNotifySide(Value) end,
+})
+
+MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", {
+    Default = "RightControl", NoUI = true, Text = "Menu keybind",
+})
+
+MenuGroup:AddButton({
+    Text = "Unload Script",
+    Func = function()
+        for key in pairs(activeThreads) do
+            setLoopState(key, false)
+        end
+        Obsidian:Unload()
+    end,
+})
+
+Obsidian.ToggleKeybind = Obsidian.Options.MenuKeybind
+
+-- 6. SETUP THEME & CONFIG SAVE SYSTEM
+ThemeManager:SetLibrary(Obsidian)
+SaveManager:SetLibrary(Obsidian)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("RilzzHub_MapScan")
+SaveManager:SetFolder("RilzzHub_MapScan/configs")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+SaveManager:LoadAutoloadConfig()
+
+-- Notification Loaded
+Obsidian:Notify({
+    Title       = "Rilzz Hub 👑",
+    Description = "Script berhasil dimuat dan dioptimasi!",
+    Time        = 4
+})
