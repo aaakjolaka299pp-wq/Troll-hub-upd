@@ -1,0 +1,385 @@
+-- Rilzz Hub | STEAL AN EGG
+-- UI Library: Obsidian
+-- Credits: by Rilz Hub
+
+local Players           = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService        = game:GetService("RunService")
+local Workspace         = game:GetService("Workspace")
+local LocalPlayer       = Players.LocalPlayer
+
+-- ========================
+-- LOAD LIBRARY (OBSIDIAN)
+-- ========================
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+
+local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+Library.ShowToggleFrameInKeybinds = true
+
+-- ========================
+-- WINDOW & TABS SETUP
+-- ========================
+local Window = Library:CreateWindow({
+    Title            = "Rilzz Hub",
+    Footer           = "STEAL AN EGG | by Rilz Hub",
+    Icon             = "zap",
+    NotifySide       = "Right",
+    ShowCustomCursor = true,
+    AutoShow         = true,
+})
+
+local Tabs = {
+    Farm            = Window:AddTab("Auto Farm",    "zap"),
+    Automation      = Window:AddTab("Automation",   "bot"),
+    ["UI Settings"] = Window:AddTab("UI Settings", "settings"),
+}
+
+-- ========================
+-- THREAD / LOOP HELPER
+-- ========================
+local threads = {}
+
+local function startLoop(key, fn, getDelay)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+    threads[key] = task.spawn(function()
+        while Toggles[key] and Toggles[key].Value do
+            pcall(fn)
+            local d = getDelay and getDelay() or 0.5
+            if d <= 0 then task.wait() else task.wait(d) end
+        end
+    end)
+end
+
+local function stopLoop(key)
+    if threads[key] then task.cancel(threads[key]) threads[key] = nil end
+end
+
+-- ========================
+-- CORE GAME LOGIC & DATA
+-- ========================
+local FarmZones = {
+    { Name = "Forest Zone", Pos = Vector3.new(593, 71, -325) },
+    { Name = "Lake Zone", Pos = Vector3.new(743, 71, -409) },
+    { Name = "Desert Zone", Pos = Vector3.new(947, 71, -324) },
+    { Name = "Jungle Zone", Pos = Vector3.new(1184, 71, -409) },
+    { Name = "Snow Zone", Pos = Vector3.new(1487, 71, -316) },
+    { Name = "Volcano Zone", Pos = Vector3.new(1877, 71, -396) },
+    { Name = "Abyss Ocean Zone", Pos = Vector3.new(2276, 71, -324) },
+    { Name = "Prehistoric Zone", Pos = Vector3.new(2810, 71, -396) },
+    { Name = "Cosmic Zone", Pos = Vector3.new(3391, 71, -327) }
+}
+
+local activeFarmZone = nil
+
+local function SmoothMoveTo(targetPos, toggleKey)
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart", 5)
+    if not hrp then return false end
+
+    while Toggles[toggleKey] and Toggles[toggleKey].Value do
+        local currentPos = hrp.Position
+        local distance = (targetPos - currentPos).Magnitude
+        
+        if distance < 4 then
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            return true
+        end
+
+        local direction = (targetPos - currentPos).Unit
+        local speed = math.min(300, distance * 25)
+        
+        hrp.CFrame = CFrame.new(currentPos + direction * speed * RunService.Heartbeat:Wait(), targetPos)
+        hrp.AssemblyLinearVelocity = Vector3.zero
+    end
+    return false
+end
+
+local function RunFarmLogic(targetPos, toggleKey)
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hum = char:WaitForChild("Humanoid", 5)
+    local hrp = char:WaitForChild("HumanoidRootPart", 5)
+    local animator = hum:WaitForChild("Animator", 5)
+
+    if not (char and hum and hrp) then return end
+
+    local animTrack
+    pcall(function()
+        local anim = Instance.new("Animation")
+        anim.AnimationId = "rbxassetid://507765644"
+        animTrack = animator:LoadAnimation(anim)
+        animTrack.Looped = true
+        animTrack:Play()
+        animTrack:AdjustSpeed(2.5)
+    end)
+
+    pcall(function()
+        if SmoothMoveTo(targetPos, toggleKey) then
+            task.wait(0.5)
+
+            if Toggles[toggleKey] and Toggles[toggleKey].Value then
+                local closestPromptPart = nil
+                local closestPos = nil
+                local shortestDist = math.huge
+
+                for _, obj in ipairs(Workspace:GetDescendants()) do
+                    if obj.Name == "SmartPromptPart" and (obj:IsA("BasePart") or obj:IsA("Model")) then
+                        local pPos = obj:IsA("BasePart") and obj.Position or obj:GetPivot().Position
+                        local dist = (hrp.Position - pPos).Magnitude
+                        if dist < shortestDist then
+                            shortestDist = dist
+                            closestPos = pPos
+                            closestPromptPart = obj
+                        end
+                    end
+                end
+
+                if closestPromptPart and closestPos then
+                    SmoothMoveTo(closestPos, toggleKey)
+                    for _, prompt in ipairs(closestPromptPart:GetDescendants()) do
+                        if prompt:IsA("ProximityPrompt") then
+                            pcall(function()
+                                prompt.MaxActivationDistance = math.huge
+                                if fireproximityprompt then
+                                    fireproximityprompt(prompt)
+                                else
+                                    prompt:InputHoldBegin()
+                                    task.wait(prompt.HoldDuration or 0.1)
+                                    prompt:InputHoldEnd()
+                                end
+                            end)
+                        end
+                    end
+                    task.wait(0.2)
+                end
+            end
+        end
+
+        SmoothMoveTo(Vector3.new(488, 71, -362), toggleKey)
+    end)
+
+    if animTrack then pcall(function() animTrack:Stop() end) end
+    pcall(function()
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+        hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+    end)
+end
+
+-- ========================
+-- TAB: AUTO FARM
+-- ========================
+local FarmGroup = Tabs.Farm:AddLeftGroupbox("Select Zone to Farm", "map-pin")
+
+for _, zone in ipairs(FarmZones) do
+    local toggleKey = "Farm_" .. zone.Name:gsub("%s+", "")
+    
+    FarmGroup:AddToggle(toggleKey, {
+        Text    = zone.Name,
+        Default = false,
+        Tooltip = "Auto farm di area " .. zone.Name,
+        Callback = function(state)
+            if state then
+                startLoop(toggleKey, function()
+                    RunFarmLogic(zone.Pos, toggleKey)
+                end, function() return 0.1 end)
+            else
+                stopLoop(toggleKey)
+            end
+        end,
+    })
+end
+
+-- ========================
+-- TAB: AUTOMATION
+-- ========================
+local AutoGroupLeft  = Tabs.Automation:AddLeftGroupbox("Eggs & Treadmill", "cpu")
+local AutoGroupRight = Tabs.Automation:AddRightGroupbox("Inventory",       "shopping-bag")
+
+-- AUTO HATCH
+AutoGroupLeft:AddToggle("AutoHatch", {
+    Text    = "Auto Hatch Eggs",
+    Default = false,
+    Tooltip = "Auto hatch telur yang sudah siap di-hatch",
+    Callback = function(state)
+        if state then
+            startLoop("AutoHatch", function()
+                local eggCmds = require(ReplicatedStorage.Library.Client.EggCmds)
+                local eggRenderer = require(ReplicatedStorage.Library.Client.Eggs.PlacedEggRenderer)
+                local eggItemUtil = require(ReplicatedStorage.Library.Util.EggItemUtil)
+
+                local records = eggCmds.GetOwnerRuntimeRecords(LocalPlayer.UserId)
+                if records then
+                    local serverTime = Workspace:GetServerTimeNow()
+                    for eggId, recordData in pairs(records) do
+                        if recordData.Placement ~= nil then
+                            local alpha = eggItemUtil.GetGrowthAlpha(
+                                recordData, 
+                                serverTime, 
+                                recordData.GrowthSpeedMultiplier, 
+                                eggItemUtil.GetCurrentNightGrowthCreditSeconds(recordData, serverTime, recordData.GrowthSpeedMultiplier)
+                            )
+                            if alpha >= 1 then
+                                eggRenderer.ActivateLocalEgg(eggId)
+                            end
+                        end
+                    end
+                end
+            end, function() return Options.AutoHatchDelay.Value end)
+        else
+            stopLoop("AutoHatch")
+        end
+    end,
+})
+
+AutoGroupLeft:AddSlider("AutoHatchDelay", {
+    Text = "Auto Hatch Delay", Default = 1, Min = 0.1, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+AutoGroupLeft:AddDivider()
+
+-- AUTO UPGRADE TREADMILL
+AutoGroupLeft:AddToggle("AutoUpgradeTreadmill", {
+    Text    = "Auto Upgrade Treadmill",
+    Default = false,
+    Tooltip = "Auto upgrade treadmill saat uang mencukupi",
+    Callback = function(state)
+        if state then
+            startLoop("AutoUpgradeTreadmill", function()
+                local upgradeRemote = ReplicatedStorage:WaitForChild("Network"):WaitForChild("Treadmills: RequestUpgrade")
+                local saveLib = require(ReplicatedStorage.Library.Client.Save)
+                local treadmillDir = require(ReplicatedStorage.Directory.Treadmills)
+
+                local pData = saveLib.Get()
+                if pData then
+                    local currentLvl = pData.TreadmillUpgradeLevel or 0
+                    local nextUpgrade = treadmillDir.GetByUpgradeLevel(currentLvl + 1)
+                    if nextUpgrade and (pData.Money or 0) >= nextUpgrade.Price then
+                        upgradeRemote:InvokeServer(nextUpgrade._id)
+                    end
+                end
+            end, function() return Options.AutoUpgradeTreadmillDelay.Value end)
+        else
+            stopLoop("AutoUpgradeTreadmill")
+        end
+    end,
+})
+
+AutoGroupLeft:AddSlider("AutoUpgradeTreadmillDelay", {
+    Text = "Upgrade Delay", Default = 1, Min = 0.1, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+-- AUTO SELL
+AutoGroupRight:AddToggle("AutoSell", {
+    Text    = "Auto Sell Items",
+    Default = false,
+    Tooltip = "Auto sell item dengan rarity Common, Uncommon, dan Rare",
+    Callback = function(state)
+        if state then
+            startLoop("AutoSell", function()
+                local sellRemote = ReplicatedStorage:WaitForChild("Network"):WaitForChild("AssetInventory: SellAllAssets")
+                local saveLib = require(ReplicatedStorage.Library.Client.Save)
+
+                local itemsToSell = {}
+                local pData = saveLib.Get()
+                if pData then
+                    local inv = pData.AssetInventory or pData.Inventory or pData.Assets
+                    if inv then
+                        for itemId, itemData in pairs(inv) do
+                            local rarity = itemData.Rarity or itemData.RarityId or "Common"
+                            if rarity == "Common" or rarity == "Uncommon" or rarity == "Rare" then
+                                local idToInsert = (type(itemId) == "string" and #itemId >= 20) and itemId or itemData._id
+                                table.insert(itemsToSell, idToInsert)
+                            end
+                        end
+                    end
+                end
+            end, function() return Options.AutoSellDelay.Value end)
+        else
+            stopLoop("AutoSell")
+        end
+    end,
+})
+
+AutoGroupRight:AddSlider("AutoSellDelay", {
+    Text = "Auto Sell Delay", Default = 1, Min = 0.1, Max = 5, Rounding = 1, Suffix = "s",
+})
+
+-- ========================
+-- TAB: UI SETTINGS
+-- ========================
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu Settings", "wrench")
+
+MenuGroup:AddToggle("KeybindMenuOpen", {
+    Default  = Library.KeybindFrame.Visible,
+    Text     = "Open Keybind Menu",
+    Callback = function(Value) Library.KeybindFrame.Visible = Value end,
+})
+
+MenuGroup:AddToggle("ShowCustomCursor", {
+    Text     = "Custom Cursor", 
+    Default  = true,
+    Callback = function(Value) Library.ShowCustomCursor = Value end,
+})
+
+MenuGroup:AddDropdown("NotificationSide", {
+    Values   = { "Left", "Right" }, 
+    Default  = "Right", 
+    Text     = "Notification Side",
+    Callback = function(Value) Library:SetNotifySide(Value) end,
+})
+
+MenuGroup:AddDropdown("DPIDropdown", {
+    Values   = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" }, 
+    Default  = "100%", 
+    Text     = "DPI Scale",
+    Callback = function(Value)
+        Value = Value:gsub("%%", "")
+        Library:SetDPIScale(tonumber(Value))
+    end,
+})
+
+MenuGroup:AddDivider()
+
+MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", {
+    Default = "RightShift", NoUI = true, Text = "Menu keybind",
+})
+
+MenuGroup:AddButton({
+    Text = "Unload Script",
+    Func = function()
+        for key in pairs(threads) do stopLoop(key) end
+        Library:Unload()
+    end,
+})
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+-- ========================
+-- SETUP ADDON & CONFIG
+-- ========================
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("RilzzHub_StealAnEgg")
+SaveManager:SetFolder("RilzzHub_StealAnEgg/configs")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+SaveManager:LoadAutoloadConfig()
+
+Library:Notify({
+    Title       = "Rilzz Hub",
+    Description = "Script successfully loaded! by Rilz Hub",
+    Time        = 4,
+})
