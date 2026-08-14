@@ -1,0 +1,320 @@
+-- ================================================================= --
+--                    RILZZ SCRIPT - SAVE ANIMALS 🐾                --
+--                    UI Library: LinoriaLib / Obsidian             --
+-- ================================================================= --
+
+local repo = "https://raw.githubusercontent.com/joustingmatch/ObsidianUltra/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+-- Setup Window
+local Window = Library:CreateWindow({
+	Title = "Rilzz Hub ",
+	Icon = 95816097006870,
+	NotifySide = "Right",
+	ShowCustomCursor = true,
+	Footer = {
+		"Rilzz Hub | ",
+		{ Text = "Save Animals Script", Copyable = false },
+		" | ",
+		{ Text = "User ID", Copyable = true, CopyText = tostring(game.Players.LocalPlayer.UserId) },
+	},
+	FuzzySearch = true,
+	SearchValues = true,
+	SearchKeybind = Enum.KeyCode.F,
+	Minimizable = true,
+	MinimizeKeybind = Enum.KeyCode.RightBracket,
+	MinimizedWidth = 300,
+})
+
+-- Services
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+-- Tabs Setup
+local Tabs = {
+	Farm = Window:AddTab({ Name = "Auto Farm Zoo", Icon = "paw-print", Description = "Teleport & Farm Animals" }),
+	Automation = Window:AddTab({ Name = "Automation", Icon = "cpu", Description = "Base & Upgrades" }),
+	["UI Settings"] = Window:AddTab({ Name = "UI Settings", Icon = "settings", Description = "Configure the menu" }),
+}
+
+-- Remote Invoker Helper
+local function FireRemote(remoteName, remoteType, argument)
+	task.spawn(function()
+		pcall(function()
+			local remoteFolder = ReplicatedStorage:WaitForChild("Utilities", 5):WaitForChild("TypedRemote", 5)
+			if remoteFolder then
+				local remote = remoteFolder:FindFirstChild(remoteName)
+				if remote then
+					if remoteType == "Event" then
+						remote:FireServer(argument)
+					elseif remoteType == "Function" then
+						remote:InvokeServer(argument)
+					end
+				end
+			end
+		end)
+	end)
+end
+
+-- ================================================================= --
+--                       TAB 1: AUTO FARM ZOO                        --
+-- ================================================================= --
+
+local FarmLeftGroup = Tabs.Farm:AddLeftGroupbox("Zoo Locations ", "map-pin")
+local FarmRightGroup = Tabs.Farm:AddRightGroupbox("Zoo Locations ", "map-pin")
+
+local ZooLocations = {
+	{ Name = "NOOB ZOO", CFrame = Vector3.new(175, 10, -10), Group = FarmLeftGroup },
+	{ Name = "BACON ZOO", CFrame = Vector3.new(169, 10, 147), Group = FarmLeftGroup },
+	{ Name = "PRINCESS ZOO", CFrame = Vector3.new(262, 10, -14), Group = FarmLeftGroup },
+	{ Name = "OFFICER ZOO", CFrame = Vector3.new(258, 10, 150), Group = FarmLeftGroup },
+	{ Name = "ZOMBIE ZOO", CFrame = Vector3.new(362, 10, -16), Group = FarmLeftGroup },
+	{ Name = "SAMMY ZOO", CFrame = Vector3.new(356, 10, 149), Group = FarmRightGroup },
+	{ Name = "FARMER ZOO", CFrame = Vector3.new(462, 10, -15), Group = FarmRightGroup },
+	{ Name = "ROBBER ZOO", CFrame = Vector3.new(456, 10, 141), Group = FarmRightGroup },
+	{ Name = "MONKEY ZOO", CFrame = Vector3.new(562, 10, -12), Group = FarmRightGroup },
+	{ Name = "ICE KING ZOO", CFrame = Vector3.new(557, 10, 144), Group = FarmRightGroup },
+	{ Name = "DRAGON LAIR", CFrame = Vector3.new(678, 19, 70), Group = FarmRightGroup },
+}
+
+local function RunAutoFarmLoop(zooName, targetCFrame, toggleIndex)
+	task.spawn(function()
+		local homePosition = Vector3.new(117, 9, 65)
+		
+		while Toggles[toggleIndex] and Toggles[toggleIndex].Value do
+			local character = LocalPlayer.Character
+			if character and character:FindFirstChild("HumanoidRootPart") then
+				local hrp = character.HumanoidRootPart
+				
+				-- Teleport ke Zoo Target
+				hrp.CFrame = CFrame.new(targetCFrame)
+				task.wait(0.2)
+				
+				-- Cari ProximityPrompt Terdekat
+				local nearestPrompt = nil
+				local nearestPart = nil
+				local shortestDistance = math.huge
+				
+				for _, obj in ipairs(workspace:GetDescendants()) do
+					if obj:IsA("ProximityPrompt") and obj.Enabled then
+						local parentPart = obj.Parent
+						local partPos = nil
+						
+						if parentPart:IsA("BasePart") then
+							partPos = parentPart.Position
+						elseif parentPart:IsA("Model") and parentPart.PrimaryPart then
+							partPos = parentPart.PrimaryPart.Position
+						end
+						
+						if partPos then
+							local dist = (hrp.Position - partPos).Magnitude
+							if dist < shortestDistance then
+								shortestDistance = dist
+								nearestPrompt = obj
+								nearestPart = parentPart
+							end
+						end
+					end
+				end
+				
+				-- Interaksi
+				if nearestPrompt and nearestPart then
+					hrp.CFrame = nearestPart:IsA("BasePart") and nearestPart.CFrame or nearestPart:GetPivot()
+					task.wait(0.1)
+					
+					if fireproximityprompt then
+						fireproximityprompt(nearestPrompt)
+					else
+						nearestPrompt:InputHoldBegin()
+						task.wait(nearestPrompt.HoldDuration)
+						nearestPrompt:InputHoldEnd()
+					end
+					task.wait(0.1)
+				end
+				
+				-- Kembali ke Safezone
+				hrp.CFrame = CFrame.new(homePosition)
+			end
+			task.wait(0.8)
+		end
+	end)
+end
+
+-- Dynamic Toggles Generation
+for _, zoo in ipairs(ZooLocations) do
+	local toggleIdx = "Farm_" .. zoo.Name:gsub("%s+", "_")
+	
+	zoo.Group:AddToggle(toggleIdx, {
+		Text = "Auto " .. zoo.Name,
+		Default = false,
+		Tooltip = "Otomatis farm di " .. zoo.Name,
+	})
+	
+	Toggles[toggleIdx]:OnChanged(function()
+		if Toggles[toggleIdx].Value then
+			RunAutoFarmLoop(zoo.Name, zoo.CFrame, toggleIdx)
+		end
+	end)
+end
+
+-- ================================================================= --
+--                     TAB 2: BASE & AUTOMATION                      --
+-- ================================================================= --
+
+local AutoBaseGroup = Tabs.Automation:AddLeftGroupbox("Base Collector", "coins")
+local AutoActionGroup = Tabs.Automation:AddRightGroupbox("Base Actions", "zap")
+
+-- Auto Collect Cash
+AutoBaseGroup:AddToggle("AutoCollectCash", {
+	Text = "Auto Collect Cash",
+	Default = false,
+	Tooltip = "Mengambil uang otomatis dari plot",
+})
+
+Toggles.AutoCollectCash:OnChanged(function()
+	if Toggles.AutoCollectCash.Value then
+		task.spawn(function()
+			while Toggles.AutoCollectCash.Value do
+				local character = LocalPlayer.Character
+				if character and character:FindFirstChild("HumanoidRootPart") then
+					local hrp = character.HumanoidRootPart
+					local plots = workspace:FindFirstChild("Plots") or workspace:FindFirstChild("Bases")
+					
+					if plots then
+						for _, plot in ipairs(plots:GetChildren()) do
+							for _, part in ipairs(plot:GetDescendants()) do
+								if part:IsA("BasePart") and part.Name:sub(1, 2) == "A_" then
+									if firetouchinterest then
+										firetouchinterest(hrp, part, 0)
+										firetouchinterest(hrp, part, 1)
+									end
+								end
+							end
+						end
+					end
+				end
+				task.wait(0.5)
+			end
+		end)
+	end
+end)
+
+-- Auto Upgrade Base
+AutoActionGroup:AddToggle("AutoUpgradeBase", {
+	Text = "Auto Upgrade Base",
+	Default = false,
+})
+
+Toggles.AutoUpgradeBase:OnChanged(function()
+	if Toggles.AutoUpgradeBase.Value then
+		task.spawn(function()
+			while Toggles.AutoUpgradeBase.Value do
+				FireRemote("PurchaseUpgrade", "Event", "StandUpgrade")
+				task.wait(1)
+			end
+		end)
+	end
+end)
+
+-- Auto Sell All
+AutoActionGroup:AddToggle("AutoSellAll", {
+	Text = "Auto Sell All",
+	Default = false,
+})
+
+Toggles.AutoSellAll:OnChanged(function()
+	if Toggles.AutoSellAll.Value then
+		task.spawn(function()
+			while Toggles.AutoSellAll.Value do
+				FireRemote("SellRemote", "Function", "SellAll")
+				task.wait(1)
+			end
+		end)
+	end
+end)
+
+-- Auto Rebirth
+AutoActionGroup:AddToggle("AutoRebirth", {
+	Text = "Auto Rebirth",
+	Default = false,
+})
+
+Toggles.AutoRebirth:OnChanged(function()
+	if Toggles.AutoRebirth.Value then
+		task.spawn(function()
+			while Toggles.AutoRebirth.Value do
+				FireRemote("Rebirth", "Function")
+				task.wait(2)
+			end
+		end)
+	end
+end)
+
+-- ================================================================= --
+--                     TAB 3: UI SETTINGS & CONFIG                   --
+-- ================================================================= --
+
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu Settings", "wrench")
+
+MenuGroup:AddToggle("KeybindMenuOpen", {
+	Default = Library.KeybindFrame.Visible,
+	Text = "Open Keybind Menu",
+	Callback = function(value)
+		Library.KeybindFrame.Visible = value
+	end,
+})
+
+MenuGroup:AddToggle("ShowCustomCursor", {
+	Text = "Custom Cursor",
+	Default = Library.ShowCustomCursor,
+	Callback = function(Value)
+		Library.ShowCustomCursor = Value
+	end,
+})
+
+MenuGroup:AddDropdown("NotificationSide", {
+	Values = { "Left", "Right" },
+	Default = "Right",
+	Text = "Notification Side",
+	Callback = function(Value)
+		Library:SetNotifySide(Value)
+	end,
+})
+
+MenuGroup:AddDivider()
+MenuGroup:AddLabel("Menu bind")
+	:AddKeyPicker("MenuKeybind", { Default = "RightShift", NoUI = true, Text = "Menu keybind" })
+
+MenuGroup:AddButton("Unload Script", function()
+	Library:Unload()
+end)
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+-- Theme & Config Managers
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("RilzzHub")
+SaveManager:SetFolder("RilzzHub/save-animals")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+SaveManager:LoadAutoloadConfig()
+
+-- Notification Initialized
+Library:Notify({
+	Title = "Rilzz Hub",
+	Description = "Save Animals Script berhasil dimuat dengan LinoriaLib!",
+	Time = 5,
+})
