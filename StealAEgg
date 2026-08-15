@@ -162,7 +162,7 @@ local function SmoothMoveTo(targetPos, toggleKey)
 		end
 
 		local direction = (targetPos - currentPos).Unit
-		local speed = math.min(600, distance * 100)
+		local speed = math.min(450, distance * 100)
 		hrp.CFrame = CFrame.new(currentPos + direction * speed * RunService.Heartbeat:Wait(), targetPos)
 		hrp.AssemblyLinearVelocity = Vector3.zero
 	end
