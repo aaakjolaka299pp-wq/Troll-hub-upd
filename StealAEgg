@@ -1,7 +1,6 @@
-
 -- ================================================================= --
 --                    RILZZ HUB | STEAL AN EGG 🥚                   --
---                    UI Library: Obsidian                           --
+--                    UI Library: Obsidian Ultra                     --
 --                    Credits: by Rilz Hub                           --
 -- ================================================================= --
 
@@ -12,9 +11,9 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
 -- ================================================================= --
---                       LOAD LIBRARY (OBSIDIAN)                     --
+--                       LOAD LIBRARY (OBSIDIAN ULTRA)              --
 -- ================================================================= --
-local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local repo = "https://raw.githubusercontent.com/joustingmatch/ObsidianUltra/main/"
 local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
@@ -147,7 +146,6 @@ local FarmZones = {
 	{ Name = "Cosmic Zone", Pos = Vector3.new(3391, 71, -327) },
 }
 
--- SmoothMoveTo dengan Kecepatan yang Dinaikkan (Max Speed: 1200)
 local function SmoothMoveTo(targetPos, toggleKey)
 	local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 	local hrp = char:WaitForChild("HumanoidRootPart", 5)
