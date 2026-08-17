@@ -1,0 +1,692 @@
+--[[
+    ═══════════════════════════════════════════════════════════════
+     RILZZ HUB 👑 — Merge a Mini Army
+     UI      : ObsidianUltra (LinoriaLib Framework)
+     Game    : [🧟] Merge a Mini Army (PlaceId 105724836892064)
+    ═══════════════════════════════════════════════════════════════
+]]
+
+--// ============================ SERVICES ============================
+local Players           = game:GetService("Players")
+local Workspace         = game:GetService("Workspace")
+local VirtualInputMgr   = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui   = LocalPlayer:WaitForChild("PlayerGui")
+
+--// ======================== OBSIDIAN ULTRA =========================
+local repo = "https://raw.githubusercontent.com/joustingmatch/ObsidianUltra/main/"
+local Library = loadstring(game:HttpGet(repo .. "Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
+
+local Options = Library.Options
+local Toggles = Library.Toggles
+
+-- Setup Window UI
+local Window = Library:CreateWindow({
+	Title = "Rilzz Hub 👑",
+	Icon = 95816097006870,
+	NotifySide = "Right",
+	ShowCustomCursor = true,
+	Footer = {
+		"Rilzz Hub 👑 |",
+		{ Text = "Merge a Mini Army", Copyable = false },
+		"|",
+		{ Text = "User ID: " .. tostring(LocalPlayer.UserId), Copyable = true, CopyText = tostring(LocalPlayer.UserId) },
+	},
+	CopyableFooter = true,
+	FuzzySearch = true,
+	SearchValues = true,
+	SearchKeybind = Enum.KeyCode.F,
+	Minimizable = true,
+	MinimizeKeybind = Enum.KeyCode.RightBracket,
+	MinimizedWidth = 300,
+})
+
+-- Setup Tabs
+local Tabs = {
+	Main = Window:AddTab({ Name = "Main", Icon = "swords", Description = "Fitur Utama & Otomatisasi" }),
+	Upgrade = Window:AddTab({ Name = "Upgrade", Icon = "arrow-up", Description = "Auto Upgrade Stats" }),
+	["UI Settings"] = Window:AddTab({ Name = "UI Settings", Icon = "settings", Description = "Konfigurasi UI & Tema" }),
+}
+
+--// ============================ STATE ===============================
+local State = {
+	AutoMerge        = false,
+	MergeDelay       = 0.35,
+	MagnetFallback   = true,
+
+	AutoDeploy       = false,
+	DeployInterval   = 1.0,
+
+	AutoUpgSpawnTier   = false,
+	AutoUpgMaxDeployed = false,
+	AutoUpgBaseCap     = false,
+	UpgradeDelay       = 0.15,
+}
+
+--// ============================ UTIL ================================
+local function Notify(title, content, dur)
+	pcall(function()
+		Library:Notify({
+			Title = title,
+			Description = content,
+			Time = dur or 3,
+		})
+	end)
+end
+
+local function GetHRP()
+	local char = LocalPlayer.Character
+	return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+local function ClickGuiButton(obj)
+	if not obj then return false end
+	local btn = obj
+	if not btn:IsA("GuiButton") then
+		btn = obj:FindFirstChildWhichIsA("GuiButton", true)
+	end
+
+	local target = btn or obj
+	if btn then
+		local getcons = getconnections or get_signal_cons
+		if getcons then
+			local ok = pcall(function()
+				local fired = false
+				for _, signal in ipairs({ btn.Activated, btn.MouseButton1Click }) do
+					for _, con in ipairs(getcons(signal)) do
+						if con.Fire then con:Fire() fired = true
+						elseif con.Function then task.spawn(con.Function) fired = true end
+					end
+				end
+				if not fired then error("no connection") end
+			end)
+			if ok then return true end
+		end
+		if firesignal then
+			local ok = pcall(function()
+				firesignal(btn.MouseButton1Click)
+				firesignal(btn.Activated)
+			end)
+			if ok then return true end
+		end
+	end
+
+	if target:IsA("GuiObject") then
+		local ok = pcall(function()
+			local pos  = target.AbsolutePosition
+			local size = target.AbsoluteSize
+			local x, y = pos.X + size.X / 2, pos.Y + size.Y / 2 + 36
+			VirtualInputMgr:SendMouseButtonEvent(x, y, 0, true,  game, 1)
+			task.wait(0.03)
+			VirtualInputMgr:SendMouseButtonEvent(x, y, 0, false, game, 1)
+		end)
+		return ok
+	end
+	return false
+end
+
+local function ParseTier(text)
+	if type(text) ~= "string" then return nil end
+	local num, suffix = text:match("Tier%s+([%d%.]+)%s*([KMBT]?)")
+	if not num then return nil end
+	local v = tonumber(num)
+	if not v then return nil end
+	local mult = { K = 1e3, M = 1e6, B = 1e9, T = 1e12 }
+	return v * (mult[suffix] or 1)
+end
+
+--// ======================= GAME: PLOT & UNITS =======================
+local UID = tostring(LocalPlayer.UserId)
+
+local function GetMyPlot()
+	local plots = Workspace:FindFirstChild("Plots")
+	if not plots then return nil end
+	for _, plot in ipairs(plots:GetChildren()) do
+		local units = plot:FindFirstChild("Units")
+		if units then
+			for _, key in ipairs(units:GetChildren()) do
+				if key.Name:find(UID, 1, true) then
+					return plot
+				end
+			end
+		end
+	end
+	return nil
+end
+
+local function GetMyUnits(plot)
+	local out = {}
+	if not plot then return out end
+	local units = plot:FindFirstChild("Units")
+	if not units then return out end
+
+	for _, key in ipairs(units:GetChildren()) do
+		if key.Name:find(UID, 1, true) then
+			local model = key:FindFirstChildOfClass("Model")
+			if model then
+				local hitbox = model:FindFirstChild("MergeHitbox")
+					or model.PrimaryPart
+					or model:FindFirstChild("HumanoidRootPart")
+				local bbg  = model:FindFirstChild("BrainrotBBG")
+				local rar  = bbg and bbg:FindFirstChild("RarityLabel")
+				local dep  = bbg and bbg:FindFirstChild("DeployedLabel")
+
+				local tierText  = rar and rar.Text or nil
+				local tierValue = ParseTier(tierText)
+				local deployed  = dep and dep.Visible or false
+				local locked    = model:GetAttribute("Locked") == true
+
+				if hitbox and tierValue and not deployed and not locked then
+					table.insert(out, {
+						Key      = key,
+						Model    = model,
+						Hitbox   = hitbox,
+						Tier     = tierValue,
+						TierText = tierText,
+						Name     = model:GetAttribute("BrainrotId") or model.Name,
+					})
+				end
+			end
+		end
+	end
+	return out
+end
+
+local function GroupByTier(list)
+	local groups = {}
+	for _, u in ipairs(list) do
+		groups[u.Tier] = groups[u.Tier] or {}
+		table.insert(groups[u.Tier], u)
+	end
+	return groups
+end
+
+--// ======================= GAME: CARRY / MERGE ======================
+local function IsCarrying()
+	local ok, vis = pcall(function()
+		local hud = PlayerGui:FindFirstChild("HUD")
+		local f = hud and hud:FindFirstChild("DropBrainrotFrame")
+		return f and f.Visible
+	end)
+	return ok and vis or false
+end
+
+local function TPTo(cf)
+	local hrp = GetHRP()
+	if hrp and cf then
+		hrp.CFrame = cf
+		return true
+	end
+	return false
+end
+
+local function TouchPart(part)
+	local hrp = GetHRP()
+	if hrp and part and firetouchinterest then
+		pcall(firetouchinterest, hrp, part, 0)
+		task.wait()
+		pcall(firetouchinterest, hrp, part, 1)
+	end
+end
+
+local function MagnetMergeStep(a, b)
+	local hrp = GetHRP()
+	if not hrp then return false end
+
+	local magnetOn = true
+	task.spawn(function()
+		while magnetOn do
+			local h = GetHRP()
+			if h then
+				pcall(function()
+					if a.Model.Parent then
+						a.Model:PivotTo(h.CFrame)
+					end
+					if b.Model.Parent then
+						b.Model:PivotTo(h.CFrame)
+					end
+				end)
+			end
+			task.wait(0.05)
+		end
+	end)
+
+	local success = false
+
+	local prompt
+	local dl = os.clock() + 2.5
+	repeat
+		prompt = a.Model:FindFirstChildWhichIsA("ProximityPrompt", true)
+		if prompt then break end
+		task.wait(0.1)
+	until os.clock() > dl
+
+	if prompt and fireproximityprompt then
+		pcall(fireproximityprompt, prompt, prompt.HoldDuration or 1)
+	else
+		TouchPart(a.Hitbox)
+	end
+
+	dl = os.clock() + 2.5
+	repeat
+		if IsCarrying() then break end
+		task.wait(0.1)
+	until os.clock() > dl
+
+	if IsCarrying() then
+		dl = os.clock() + 3
+		repeat
+			TouchPart(b.Hitbox)
+			task.wait(0.15)
+			if not b.Model.Parent or not IsCarrying() then
+				success = true
+				break
+			end
+		until os.clock() > dl
+	end
+
+	magnetOn = false
+	return success or not b.Model.Parent
+end
+
+local function PickupUnit(unit, timeout)
+	local hrp = GetHRP()
+	if not hrp or not unit.Hitbox or not unit.Hitbox.Parent then return false end
+
+	TPTo(unit.Hitbox.CFrame * CFrame.new(0, 1, 0))
+
+	local deadline = os.clock() + (timeout or 2)
+	local prompt
+	repeat
+		prompt = unit.Model:FindFirstChildWhichIsA("ProximityPrompt", true)
+		if prompt then break end
+		task.wait(0.08)
+	until os.clock() > deadline
+
+	if prompt and fireproximityprompt then
+		pcall(fireproximityprompt, prompt, prompt.HoldDuration or 1)
+	else
+		TouchPart(unit.Hitbox)
+	end
+
+	deadline = os.clock() + 2
+	repeat
+		if IsCarrying() then return true end
+		task.wait(0.08)
+	until os.clock() > deadline
+
+	return prompt ~= nil
+end
+
+local function MergeInto(target, timeout)
+	if not target.Hitbox or not target.Hitbox.Parent then return false end
+	local hitbox = target.Hitbox
+
+	local standDist = math.max(hitbox.Size.X, hitbox.Size.Z) / 2 + 2
+
+	local sides = {
+		CFrame.new(0, 0,  standDist),
+		CFrame.new(0, 0, -standDist),
+		CFrame.new( standDist, 0, 0),
+		CFrame.new(-standDist, 0, 0),
+	}
+
+	local deadline = os.clock() + (timeout or 4)
+	local sideIndex = 1
+
+	repeat
+		local hrp = GetHRP()
+		if not hrp then return false end
+
+		local standPos = (hitbox.CFrame * sides[sideIndex]).Position
+		hrp.CFrame = CFrame.lookAt(
+			Vector3.new(standPos.X, hitbox.Position.Y + 1, standPos.Z),
+			Vector3.new(hitbox.Position.X, hitbox.Position.Y + 1, hitbox.Position.Z)
+		)
+		task.wait(0.1)
+
+		for step = 1, 3 do
+			if not target.Model.Parent or not IsCarrying() then break end
+			hrp = GetHRP()
+			if not hrp then break end
+			hrp.CFrame = hrp.CFrame + hrp.CFrame.LookVector * 0.7
+			TouchPart(hitbox)
+			task.wait(0.1)
+		end
+
+		if not target.Model.Parent or not IsCarrying() then
+			return true
+		end
+
+		sideIndex = (sideIndex % #sides) + 1
+		task.wait(0.1)
+	until os.clock() > deadline
+
+	return not target.Model.Parent
+end
+
+local function DoMergeStep()
+	local plot = GetMyPlot()
+	if not plot then return false, "Plot tidak ditemukan" end
+
+	local units  = GetMyUnits(plot)
+	local groups = GroupByTier(units)
+
+	local tiers = {}
+	for tier, list in pairs(groups) do
+		if #list >= 2 then table.insert(tiers, tier) end
+	end
+	if #tiers == 0 then return false, "Tidak ada tier kembar" end
+
+	table.sort(tiers, function(a, b) return a > b end)
+
+	local pair = groups[tiers[1]]
+	local a, b = pair[1], pair[2]
+
+	local ok = MagnetMergeStep(a, b)
+
+	if not ok and State.MagnetFallback then
+		if IsCarrying() then
+			ok = MergeInto(b)
+		else
+			if PickupUnit(a) then
+				task.wait(State.MergeDelay)
+				ok = MergeInto(b)
+			end
+		end
+	end
+	task.wait(State.MergeDelay)
+
+	if ok then
+		return true, (a.Name or "?") .. " " .. tostring(a.TierText)
+	end
+	return false, "Merge gagal (" .. tostring(a.TierText) .. ")"
+end
+
+--// ======================= GAME: DEPLOY / RECALL ====================
+local function GetDeployCounts()
+	local ok, cur, max = pcall(function()
+		local label = PlayerGui.HUD.TopButtons.Deploy
+			.UnitsCurrentlyDeployed.Frame.AmountDeployed
+		return label.Text:match("(%d+)%s*/%s*(%d+)")
+	end)
+	if ok and cur and max then
+		return tonumber(cur), tonumber(max)
+	end
+	return nil, nil
+end
+
+local function ClickDeploy()
+	local ok, btn = pcall(function()
+		return PlayerGui.HUD.TopButtons.Deploy
+	end)
+	if ok and btn then return ClickGuiButton(btn) end
+	return false
+end
+
+local function TryDeploy(silent)
+	local cur, max = GetDeployCounts()
+	if not cur then
+		if not silent then Notify("Auto Deploy", "Gagal membaca status Deploy!", 3) end
+		return false
+	end
+	if cur < max then
+		ClickDeploy()
+		if not silent then
+			Notify("Auto Deploy", ("Deploy! (%d/%d)"):format(cur, max), 2)
+		end
+		return true
+	end
+	if not silent then
+		Notify("Auto Deploy", ("Sudah penuh (%d/%d), skip."):format(cur, max), 2)
+	end
+	return false
+end
+
+--// ======================= GAME: AUTO UPGRADE =======================
+local function GetBrainrotRE()
+	local ok, re = pcall(function()
+		return ReplicatedStorage.Framework.Features.BrainrotSystem.BrainrotUtil.RemoteEvent
+	end)
+	return ok and re or nil
+end
+
+local function FireUpgrade(action)
+	local re = GetBrainrotRE()
+	if re then
+		pcall(function() re:FireServer(action) end)
+		return true
+	end
+	return false
+end
+
+local function StartUpgradeSpam(stateKey, action)
+	task.spawn(function()
+		while State[stateKey] do
+			FireUpgrade(action)
+			task.wait(State.UpgradeDelay)
+		end
+	end)
+end
+
+--// ==================== BUILD UI ELEMENTS ====================
+
+-- --- TAB: MAIN ---
+local MergeGroup = Tabs.Main:AddLeftGroupbox("Auto Merge")
+local DeployGroup = Tabs.Main:AddRightGroupbox("Auto Deploy")
+
+-- Status Label
+local StatusLabel = MergeGroup:AddLabel("Status Plot: Mendeteksi...", true)
+
+local function RefreshStatus()
+	local plot  = GetMyPlot()
+	local text
+	if plot then
+		local units  = GetMyUnits(plot)
+		local groups = GroupByTier(units)
+		local pairsCount, lines = 0, {}
+		for tier, list in pairs(groups) do
+			if #list >= 2 then
+				pairsCount = pairsCount + 1
+				table.insert(lines, ("• %s ×%d"):format(list[1].TierText or tier, #list))
+			end
+		end
+		table.sort(lines)
+		text = ("Plot: %s | Unit: %d | Tier Kembar: %d\n%s")
+			:format(plot.Name, #units, pairsCount, table.concat(lines, "\n"))
+	else
+		text = "Plot belum ditemukan!"
+	end
+	pcall(function() StatusLabel:SetText(text) end)
+end
+
+MergeGroup:AddToggle("AutoMerge", {
+	Text = "Auto Merge",
+	Default = false,
+	Tooltip = "Otomatis mengabungkan unit dengan tier sama",
+	Callback = function(Value)
+		State.AutoMerge = Value
+		if Value then
+			Notify("Auto Merge", "Fitur Diaktifkan!", 2)
+			task.spawn(function()
+				while State.AutoMerge do
+					local ok = DoMergeStep()
+					if ok then
+						RefreshStatus()
+					else
+						task.wait(1.2)
+					end
+					task.wait(State.MergeDelay)
+				end
+			end)
+		end
+	end,
+})
+
+MergeGroup:AddToggle("MagnetFallback", {
+	Text = "Mode Cadangan (TP Fallback)",
+	Default = true,
+	Tooltip = "Gunakan Teleport jika metode magnet gagal",
+	Callback = function(Value)
+		State.MagnetFallback = Value
+	end,
+})
+
+MergeGroup:AddSlider("MergeDelay", {
+	Text = "Jeda Merge",
+	Default = 0.35,
+	Min = 0.1,
+	Max = 2,
+	Rounding = 2,
+	Suffix = " dtk",
+	Callback = function(Value)
+		State.MergeDelay = Value
+	end,
+})
+
+MergeGroup:AddButton({
+	Text = "Merge Manual (1x)",
+	Func = function()
+		task.spawn(function()
+			local ok, info = DoMergeStep()
+			if ok then
+				Notify("Merge", "Berhasil: " .. tostring(info), 3)
+			else
+				Notify("Merge", tostring(info), 3)
+			end
+			RefreshStatus()
+		end)
+	end,
+})
+
+-- Deploy Section
+DeployGroup:AddToggle("AutoDeploy", {
+	Text = "Auto Deploy",
+	Default = false,
+	Tooltip = "Otomatis deploy unit jika slot belum penuh",
+	Callback = function(Value)
+		State.AutoDeploy = Value
+		if Value then
+			Notify("Auto Deploy", "Fitur Diaktifkan!", 2)
+			task.spawn(function()
+				while State.AutoDeploy do
+					TryDeploy(true)
+					task.wait(State.DeployInterval)
+				end
+			end)
+		end
+	end,
+})
+
+DeployGroup:AddSlider("DeployInterval", {
+	Text = "Interval Deploy",
+	Default = 1,
+	Min = 0.5,
+	Max = 10,
+	Rounding = 1,
+	Suffix = " dtk",
+	Callback = function(Value)
+		State.DeployInterval = Value
+	end,
+})
+
+DeployGroup:AddButton({
+	Text = "Deploy Manual (1x)",
+	Func = function()
+		TryDeploy(false)
+	end,
+})
+
+DeployGroup:AddDivider()
+DeployGroup:AddButton({
+	Text = "Refresh Status Unit",
+	Func = RefreshStatus,
+})
+
+-- --- TAB: UPGRADE ---
+local UpgGroup = Tabs.Upgrade:AddLeftGroupbox("Otomatisasi Upgrade")
+
+UpgGroup:AddToggle("UpgSpawnTier", {
+	Text = "Auto Upgrade Spawn Tier",
+	Default = false,
+	Callback = function(Value)
+		State.AutoUpgSpawnTier = Value
+		if Value then
+			Notify("Auto Upgrade", "Spawn Tier aktif!", 2)
+			StartUpgradeSpam("AutoUpgSpawnTier", "UpgradeSpawnLevel")
+		end
+	end,
+})
+
+UpgGroup:AddToggle("UpgMaxDeployed", {
+	Text = "Auto Upgrade Max Deployed",
+	Default = false,
+	Callback = function(Value)
+		State.AutoUpgMaxDeployed = Value
+		if Value then
+			Notify("Auto Upgrade", "Max Deployed aktif!", 2)
+			StartUpgradeSpam("AutoUpgMaxDeployed", "UpgradeMaxOutside")
+		end
+	end,
+})
+
+UpgGroup:AddToggle("UpgBaseCap", {
+	Text = "Auto Upgrade Base Capacity",
+	Default = false,
+	Callback = function(Value)
+		State.AutoUpgBaseCap = Value
+		if Value then
+			Notify("Auto Upgrade", "Base Capacity aktif!", 2)
+			StartUpgradeSpam("AutoUpgBaseCap", "UpgradeMaxSpawned")
+		end
+	end,
+})
+
+UpgGroup:AddSlider("UpgradeDelay", {
+	Text = "Kecepatan Spam Upgrade",
+	Default = 0.15,
+	Min = 0.05,
+	Max = 2,
+	Rounding = 2,
+	Suffix = " dtk",
+	Callback = function(Value)
+		State.UpgradeDelay = Value
+	end,
+})
+
+UpgGroup:AddButton({
+	Text = "Upgrade Semua (1x)",
+	Func = function()
+		FireUpgrade("UpgradeSpawnLevel")
+		FireUpgrade("UpgradeMaxOutside")
+		FireUpgrade("UpgradeMaxSpawned")
+		Notify("Upgrade", "Perintah upgrade terkirim!", 2)
+	end,
+})
+
+-- --- TAB: UI SETTINGS ---
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
+
+ThemeManager:SetFolder("RilzzHub")
+SaveManager:SetFolder("RilzzHub/MergeMiniArmy")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+-- Finalisasi & Auto Refresh Status
+RefreshStatus()
+task.spawn(function()
+	while task.wait(5) do
+		pcall(RefreshStatus)
+	end
+end)
+
+Notify("Rilzz Hub 👑", "Script Merge a Mini Army siap digunakan!", 4)
