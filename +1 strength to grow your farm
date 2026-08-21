@@ -1,0 +1,100 @@
+-- Load Library GUI Modern (Rayfield)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Memory Protection & Cleanup UI Lama
+local parent = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+if parent:FindFirstChild("BrainrotCompleteGUI") then parent.BrainrotCompleteGUI:Destroy() end
+
+local Window = Rayfield:CreateWindow({
+   Name = "RilzHub",
+   LoadingTitle = "Memuat Hub...",
+   LoadingSubtitle = "by Erpin",
+   ConfigurationSaving = {
+      Enabled = false,
+   },
+   Discord = {
+      Enabled = false,
+   },
+   KeySystem = false
+})
+
+local MainTab = Window:CreateTab("Main Features", 4483362458) -- Icon ID
+local Section = MainTab:CreateSection("Automation Controls")
+
+-- Variables
+local autoHit = false
+local smartFarm = false
+local targetIDs = {19, 42, 86, 102, 105, 136, 139, 147}
+
+-- Helper Functions
+local function isAllowed(itemName)
+    local idNumber = tonumber(itemName:match("Brainrot_(.+)")) or tonumber(itemName)
+    if idNumber then
+        for _, allowedID in ipairs(targetIDs) do
+            if idNumber == allowedID then return true end
+        end
+    end
+    return false
+end
+
+-- Toggles
+local HitToggle = MainTab:CreateToggle({
+   Name = "Auto Hit",
+   CurrentValue = false,
+   Flag = "AutoHitFlag",
+   Callback = function(Value)
+      autoHit = Value
+   end,
+})
+
+local FarmToggle = MainTab:CreateToggle({
+   Name = "Smart Farm List",
+   CurrentValue = false,
+   Flag = "SmartFarmFlag",
+   Callback = function(Value)
+      smartFarm = Value
+   end,
+})
+
+-- Loop: Auto Hit
+task.spawn(function()
+    while true do
+        if autoHit then
+            pcall(function()
+                local remote = game:GetService("ReplicatedStorage"):FindFirstChild("RemoteEvent")
+                if remote then
+                    local args = {{{ "\024", { "HitWall", "BlockWall1" } }}}
+                    remote:FireServer(unpack(args))
+                end
+            end)
+        end
+        task.wait() 
+    end
+end)
+
+-- Loop: Smart Farm
+task.spawn(function()
+    while true do
+        if smartFarm then
+            pcall(function()
+                local modelFolder = workspace:FindFirstChild("BrainrotFolder") 
+                    and workspace.BrainrotFolder:FindFirstChild("model")
+                
+                if modelFolder then
+                    for _, item in pairs(modelFolder:GetChildren()) do
+                        if not smartFarm then break end
+                        
+                        if isAllowed(item.Name) then
+                            local prompt = item:FindFirstChildWhichIsA("ProximityPrompt", true)
+                            if prompt and prompt.Enabled then
+                                fireproximityprompt(prompt)
+                                task.wait()
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+        task.wait()
+    end
+end)
